@@ -11,7 +11,8 @@ CAPTURE_DIRECTORY = Path(__file__).resolve().parent / "captures"
 WINDOW_NAME = "PlayAnyThing - Camera"
 
 
-def main():
+def capture_image():
+    """Open the camera and return the path of the saved photo."""
     camera = cv2.VideoCapture(CAMERA_INDEX)
 
     if not camera.isOpened():
@@ -58,6 +59,7 @@ def main():
                 image_path = CAPTURE_DIRECTORY / f"capture_{timestamp}.jpg"
                 if cv2.imwrite(str(image_path), captured_frame):
                     print(f"Saved image to: {image_path}")
+                    return image_path
                 else:
                     print("Could not save the image.")
                 captured_frame = None
@@ -67,6 +69,10 @@ def main():
     finally:
         camera.release()
         cv2.destroyAllWindows()
+
+
+def main():
+    capture_image()
 
 
 if __name__ == "__main__":
