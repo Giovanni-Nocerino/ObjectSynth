@@ -3,6 +3,8 @@
 
 #include <juce_audio_basics/juce_audio_basics.h>
 #include <juce_dsp/juce_dsp.h>
+#include <array>
+#include <cmath>
 #include "WavetableOscillator.h"
 
 class SynthVoice final : public juce::SynthesiserVoice
@@ -44,7 +46,11 @@ public:
     ) override;
 
     void setWaveform(Waveform newWaveform) noexcept{
-        oscillator.setWaveform(newWaveform);
+        pendingWaveform = newWaveform;
+    }
+
+    void setCustomWaveform(const WavetableBank::Table* table) noexcept {
+        pendingCustomTable = table;
     }
 
     void setADSRParameters(const juce::ADSR::Parameters& newParameters) noexcept{
@@ -65,9 +71,45 @@ public:
         voiceFilterAmountOctaves = amountOctaves;
     }
 
+    // Oscillator bypass is smoothed even for notes already playing.
+    void setOscillatorEnabled(bool enabled) noexcept
+    {
+        oscillatorGate.setTargetValue(enabled ? 1.0f : 0.0f);
+    }
+
+    // Envelope and Unison bypass latch at the next Note On.
+    void setAmplitudeEnvelopeEnabled(bool enabled) noexcept
+    {
+        pendingAmplitudeEnvelopeEnabled = enabled;
+    }
+
+    void setUnisonEnabled(bool enabled) noexcept
+    {
+        pendingUnisonEnabled = enabled;
+    }
+
+    void setUnisonParameters(int count, float detuneCents) noexcept {
+        pendindUnisonCount = juce::jlimit(1, maxUnisonOscillators, count);
+        if (std::isfinite(detuneCents)){
+            pendingDetuneCents = juce::jlimit(0.0f, 25.0f, detuneCents);
+        }
+    }
+
 
 private:
-    WavetableOscillator oscillator;
+
+    Waveform pendingWaveform = Waveform::Sawtooth;
+    const WavetableBank::Table* pendingCustomTable = nullptr;
+
+    static constexpr int maxUnisonOscillators = 7;
+
+    std::array<WavetableOscillator, maxUnisonOscillators> oscillators;
+    int pendindUnisonCount = 1;
+    int activeUnisonCount = 1;
+    float pendingDetuneCents = 0.0f;
+    bool pendingUnisonEnabled = true;
+    bool pendingAmplitudeEnvelopeEnabled = true;
+    juce::SmoothedValue<float, juce::ValueSmoothingTypes::Linear> oscillatorGate {1.0f};
 
     juce::ADSR envelope;
     juce::ADSR::Parameters pendingADSRParameters {0.01f, 0.10f, 0.70f, 0.20f};

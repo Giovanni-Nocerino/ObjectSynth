@@ -35,9 +35,12 @@ namespace osui
 
                 setupKnob(*this, knobs[i], state,
                           ids[i], names[i], orange(), suffix);
+                knobs[i].slider.setTextBoxStyle(
+                    juce::Slider::TextBoxBelow, false, 70, 19);
             }
 
             setupPowerButton(*this, power, powerAttachment, state, "filterEnvEnabled");
+            setPowerIndicator(power);
             startTimerHz(24);
         }
 
@@ -46,14 +49,14 @@ namespace osui
             power.setBounds(getWidth() - 70, 9, 55, 22);
             auto body = getBodyBounds();
 
-            // Graph on the left.
+            // Sketch: graph on the left, six knobs in a 3x2 grid on the right.
             plotArea = body.removeFromLeft(
-                static_cast<int>(body.getWidth() * 0.44f)
+                static_cast<int>(body.getWidth() * 0.46f)
             );
 
-            body.removeFromLeft(10);
+            body.removeFromLeft(14);
 
-            // Six knobs in a 3x2 grid.
+            // Six knobs in a 3x2 grid, same dial size as the other panels.
             const int rowHeight = body.getHeight() / 2;
 
             for (int row = 0; row < 2; ++row)
@@ -72,7 +75,8 @@ namespace osui
 
                     positionKnob(
                         knobs[static_cast<std::size_t>(row * 3 + col)],
-                        cell.reduced(2, 0)
+                        cell.reduced(2, 0),
+                        52
                     );
                 }
             }

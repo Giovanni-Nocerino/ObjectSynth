@@ -19,13 +19,21 @@ namespace osui
                 {"hpCutoff", "hpResonance", "hpMix"},
                 {"bpCutoff", "bpResonance", "bpMix"}
             };
-            constexpr const char* names[] = {"CUTOFF", "RESONANCE", "MIX"};
+            // Captions are drawn once per column/row (see paint), so the
+            // individual knobs carry no label of their own.
+            constexpr const char* names[] = {"Cutoff", "Resonance", "Mix"};
+            constexpr const char* branches[] = {"Low-pass", "High-pass", "Band-pass"};
             for (std::size_t i = 0; i < controls.size(); ++i)
                 for (std::size_t j = 0; j < controls[i].size(); ++j)
-                    setupKnob(*this, controls[i][j], state, ids[i][j], names[j],
+                {
+                    setupKnob(*this, controls[i][j], state, ids[i][j], {},
                               branchColour(i), j == 0 ? " Hz" : "");
+                    controls[i][j].slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 19);
+                    controls[i][j].slider.setTooltip(juce::String(branches[i]) + " " + names[j]);
+                }
 
             setupPowerButton(*this, power, powerAttachment, state, "filterBankEnabled");
+            setPowerIndicator(power);
 
             // Only the UI timer repaints these graphs; the audio thread never draws.
             startTimerHz(24);
@@ -36,48 +44,66 @@ namespace osui
             ModulePanel::paint(g);
             drawResponse(g);
 
-            constexpr const char* names[] = {"LOW-PASS", "HIGH-PASS", "BAND-PASS"};
+            // Column captions, once above the 3x3 knob grid.
+            constexpr const char* columns[] = {"CUTOFF", "RESONANCE", "MIX"};
+            g.setColour(muted());
+            g.setFont(juce::Font(juce::FontOptions(11.0f)));
+            for (std::size_t j = 0; j < columnHeaders.size(); ++j)
+                g.drawText(columns[j], columnHeaders[j], juce::Justification::centred);
+
+            // Row keys: colour bar + short name, matching the graph legend.
+            constexpr const char* names[] = {"LP", "HP", "BP"};
             for (std::size_t i = 0; i < rows.size(); ++i)
             {
                 const auto area = rows[i];
                 if (area.isEmpty()) continue;
 
-                g.setColour(plotFill().withAlpha(0.82f));
-                g.fillRoundedRectangle(area.toFloat(), 7.0f);
-                g.setColour(panelEdge().withAlpha(0.75f));
-                g.drawRoundedRectangle(area.toFloat(), 7.0f, 1.0f);
+                if (i > 0)
+                {
+                    g.setColour(panelEdge().withAlpha(0.55f));
+                    g.drawHorizontalLine(area.getY(), static_cast<float>(area.getX()),
+                                         static_cast<float>(area.getRight()));
+                }
                 g.setColour(branchColour(i));
-                g.fillRoundedRectangle(static_cast<float>(area.getX() + 10),
-                                       static_cast<float>(area.getCentreY() - 12),
-                                       3.0f, 24.0f, 1.5f);
-                g.setFont(11.0f);
-                g.drawText(names[i], area.getX() + 18, area.getCentreY() - 12,
-                           75, 24, juce::Justification::centredLeft);
+                g.fillRoundedRectangle(static_cast<float>(area.getX() + 2),
+                                       static_cast<float>(area.getCentreY() - 13),
+                                       3.0f, 26.0f, 1.5f);
+                g.setFont(juce::Font(juce::FontOptions(13.0f, juce::Font::bold)));
+                g.drawText(names[i], area.getX() + 10, area.getCentreY() - 12,
+                           rowKeyWidth - 10, 24, juce::Justification::centredLeft);
             }
         }
 
         void resized() override
         {
-            // Dedicated large plot on the left, all nine knobs in three compact
-            // LP/HP/BP rows on the right. The editor dimensions are fixed.
+            // Sketch: response display on top, then a plain 3x3 knob grid
+            // (rows LP / HP / BP, columns Cutoff / Resonance / Mix).
             power.setBounds(getWidth() - 70, 9, 55, 22);
             auto area = getBodyBounds();
-            plotArea = area.removeFromLeft(628);
-            area.removeFromLeft(12);
+            const int graphHeight = juce::jlimit(150, 200,
+                static_cast<int>(area.getHeight() * 0.44f));
+            plotArea = area.removeFromTop(graphHeight);
+            area.removeFromTop(8);
+
+            auto header = area.removeFromTop(16);
+            header.removeFromLeft(rowKeyWidth);
+            const int columnWidth = header.getWidth() / 3;
+            for (std::size_t j = 0; j < columnHeaders.size(); ++j)
+                columnHeaders[j] = j + 1 == columnHeaders.size()
+                                       ? header : header.removeFromLeft(columnWidth);
 
             const int rowHeight = area.getHeight() / static_cast<int>(rows.size());
             for (std::size_t i = 0; i < rows.size(); ++i)
             {
                 rows[i] = i + 1 == rows.size() ? area : area.removeFromTop(rowHeight);
-                auto knobArea = rows[i].reduced(3, 3);
-                knobArea.removeFromLeft(93); // label/colour key beside each row
+                auto knobArea = rows[i].reduced(0, 2);
+                knobArea.removeFromLeft(rowKeyWidth);
 
-                const int knobWidth = knobArea.getWidth() / 3;
                 for (std::size_t j = 0; j < controls[i].size(); ++j)
                 {
                     auto cell = j + 1 == controls[i].size()
-                                    ? knobArea : knobArea.removeFromLeft(knobWidth);
-                    positionKnob(controls[i][j], cell);
+                                    ? knobArea : knobArea.removeFromLeft(columnWidth);
+                    positionKnob(controls[i][j], cell, 50);
                 }
             }
         }
@@ -245,6 +271,8 @@ namespace osui
         std::unique_ptr<ButtonAttachment> powerAttachment;
         std::array<std::array<Knob, 3>, 3> controls;
         std::array<juce::Rectangle<int>, 3> rows;
+        std::array<juce::Rectangle<int>, 3> columnHeaders;
         juce::Rectangle<int> plotArea;
+        static constexpr int rowKeyWidth = 40;
     };
 }

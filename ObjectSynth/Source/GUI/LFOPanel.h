@@ -15,6 +15,7 @@ namespace osui
             : ModulePanel("LFO"), processor(processorToUse)
         {
             setupPowerButton(*this, power, powerAttachment, state, "lfoEnabled");
+            setPowerIndicator(power);
 
             constexpr const char* waveformNames[] = {"Sine", "Saw", "Square", "Triangle"};
             for (int i = 0; i < 4; ++i)
@@ -28,7 +29,7 @@ namespace osui
                 state, "lfoWaveform", waveformChoice);
 
             rateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-            rateSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 74, 22);
+            rateSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 22);
             rateSlider.setTextValueSuffix(" Hz");
             rateSlider.setColour(juce::Slider::trackColourId, cyan());
             rateSlider.setMouseClickGrabsKeyboardFocus(false);
@@ -54,7 +55,7 @@ namespace osui
                 addAndMakeVisible(route.destination);
 
                 route.depth.setSliderStyle(juce::Slider::LinearHorizontal);
-                route.depth.setTextBoxStyle(juce::Slider::TextBoxRight, false, 55, 20);
+                route.depth.setTextBoxStyle(juce::Slider::TextBoxRight, false, 56, 22);
                 route.depth.setColour(juce::Slider::trackColourId, purple());
                 route.depth.setMouseClickGrabsKeyboardFocus(false);
                 addAndMakeVisible(route.depth);
@@ -64,6 +65,13 @@ namespace osui
                     state, juce::String("lfoRoute") + number + "Destination", route.destination);
                 route.depthAttachment = std::make_unique<SliderAttachment>(
                     state, juce::String("lfoRoute") + number + "Depth", route.depth);
+                // Display only: avoid "-0.00" for a centred depth. Set after the
+                // attachment, which installs its own text function.
+                route.depth.textFromValueFunction = [](double value)
+                {
+                    return juce::String(std::abs(value) < 0.005 ? 0.0 : value, 2);
+                };
+                route.depth.updateText();
             }
 
             startTimerHz(24);
@@ -73,28 +81,38 @@ namespace osui
         {
             power.setBounds(getWidth() - 70, 9, 55, 22);
             auto body = getBodyBounds();
+
+            // Sketch, left column: display, waveform menu, rate slider.
             auto left = body.removeFromLeft(200);
-            body.removeFromLeft(12);
+            body.removeFromLeft(18);
             routesArea = body;
 
-            plotArea = left.removeFromTop(105);
-            left.removeFromTop(6);
-            waveformChoice.setBounds(left.removeFromTop(27));
-            left.removeFromTop(5);
-            rateLabel.setBounds(left.removeFromTop(15));
-            rateSlider.setBounds(left.removeFromTop(31));
+            auto rateRow = left.removeFromBottom(26);
+            rateLabel.setBounds(rateRow.removeFromLeft(38));
+            rateSlider.setBounds(rateRow);
+            left.removeFromBottom(8);
+            waveformChoice.setBounds(left.removeFromBottom(28));
+            left.removeFromBottom(8);
+            plotArea = left;
 
+            // Sketch, right column: four rows of [destination menu] [depth slider].
             auto routesBody = routesArea;
-            routesBody.removeFromTop(20);
+            auto header = routesBody.removeFromTop(routeHeaderHeight);
+            header.removeFromLeft(routeIndexWidth);
+            depthHeader = header.removeFromRight(routeDepthWidth);
+            header.removeFromRight(10);
+            destinationHeader = header;
+
             const int rowHeight = routesBody.getHeight() / 4;
             for (std::size_t i = 0; i < routeControls.size(); ++i)
             {
                 auto row = i + 1 == routeControls.size()
                     ? routesBody : routesBody.removeFromTop(rowHeight);
-                row.removeFromLeft(18);
-                row = row.reduced(0, 7);
-                auto depthBounds = row.removeFromRight(151);
-                row.removeFromRight(8);
+                routeRows[i] = row;
+                row.removeFromLeft(routeIndexWidth);
+                row = row.withSizeKeepingCentre(row.getWidth(), juce::jmin(28, row.getHeight()));
+                auto depthBounds = row.removeFromRight(routeDepthWidth);
+                row.removeFromRight(10);
                 routeControls[i].destination.setBounds(row);
                 routeControls[i].depth.setBounds(depthBounds);
             }
@@ -141,18 +159,25 @@ namespace osui
             if (!routesArea.isEmpty())
             {
                 g.setColour(muted());
-                g.setFont(juce::Font(juce::FontOptions(10.0f)));
-                g.drawText("MODULATION DESTINATIONS", routesArea.getX() + 18,
-                           routesArea.getY(), routesArea.getWidth() - 172, 17,
-                           juce::Justification::centredLeft);
-                g.drawText("DEPTH", routesArea.getRight() - 151,
-                           routesArea.getY(), 151, 17,
-                           juce::Justification::centred);
-                const int rowHeight = (routesArea.getHeight() - 20) / 4;
-                for (int i = 0; i < 4; ++i)
-                    g.drawText(juce::String(i + 1), routesArea.getX(),
-                               routesArea.getY() + 20 + i * rowHeight,
-                               15, rowHeight, juce::Justification::centred);
+                g.setFont(juce::Font(juce::FontOptions(11.0f)));
+                g.drawText("DESTINATION", destinationHeader, juce::Justification::centredLeft);
+                g.drawText("DEPTH", depthHeader, juce::Justification::centredLeft);
+
+                g.setFont(juce::Font(juce::FontOptions(12.0f, juce::Font::bold)));
+                for (std::size_t i = 0; i < routeRows.size(); ++i)
+                {
+                    const auto row = routeRows[i];
+                    if (i > 0)
+                    {
+                        g.setColour(panelEdge().withAlpha(0.45f));
+                        g.drawHorizontalLine(row.getY(), static_cast<float>(row.getX()),
+                                             static_cast<float>(row.getRight()));
+                    }
+                    g.setColour(muted());
+                    g.drawText(juce::String(static_cast<int>(i + 1)),
+                               row.withWidth(routeIndexWidth - 4),
+                               juce::Justification::centredLeft);
+                }
             }
         }
 
@@ -191,5 +216,11 @@ namespace osui
         std::array<RouteControls, 4> routeControls;
         juce::Rectangle<int> plotArea;
         juce::Rectangle<int> routesArea;
+        juce::Rectangle<int> destinationHeader, depthHeader;
+        std::array<juce::Rectangle<int>, 4> routeRows;
+
+        static constexpr int routeHeaderHeight = 18;
+        static constexpr int routeIndexWidth = 20;
+        static constexpr int routeDepthWidth = 150;
     };
 }

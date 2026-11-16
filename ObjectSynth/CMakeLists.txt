@@ -36,6 +36,7 @@ target_sources(ObjectSynth PRIVATE
     Source/Synth/SynthVoice.cpp
     Source/Synth/SynthVoice.h
     Source/Synth/SynthSound.h
+    Source/Synth/WavetableLoader.cpp
     Source/DSP/FilterBank.h
 )
 
@@ -52,7 +53,22 @@ target_link_libraries(ObjectSynth
         juce::juce_audio_utils
         juce::juce_audio_basics
         juce::juce_dsp
+        juce::juce_audio_formats
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_warning_flags
+)
+
+juce_add_console_app(ObjectSynthWavetableTest
+    PRODUCT_NAME "ObjectSynthWavetableTest"
+    NEEDS_CURL FALSE
+)
+
+target_sources(ObjectSynthWavetableTest PRIVATE
+    Tests/WavetableLoaderSmokeTest.cpp
+    Source/Synth/WavetableLoader.cpp
+)
+
+target_link_libraries(ObjectSynthWavetableTest PRIVATE
+    juce::juce_audio_formats
 )

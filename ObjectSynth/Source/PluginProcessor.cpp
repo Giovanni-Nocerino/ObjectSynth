@@ -1,5 +1,7 @@
 #include <cmath>
 #include <algorithm>
+#include <limits>
+#include <utility>
 #include "PluginProcessor.h"
 #include "PluginEditor.h"
 #include "Synth/SynthVoice.h"
@@ -109,8 +111,17 @@ ObjectSynthAudioProcessor::createParameterLayout(){
         juce::ParameterID{"filterEnvAmount", 1}, "Filter Env Amount", juce::NormalisableRange<float>{-4.0f, 4.0f, 0.1f}, 3.0f
     ));
 
+    layout.add(std::make_unique<juce::AudioParameterInt>(
+        juce::ParameterID{"unisonCount", 1}, "Unison Oscillators", 1, 7 , 7
+    ));
+
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"unisonDetune", 1}, "Unison Detune", 0.0f, 25.0f, 20.0f
+    ));
+
     // Module bypass is deliberately independent from Dry/Wet and Mix.
-    for (const auto* id : {"filterBankEnabled", "filterEnvEnabled",
+    for (const auto* id : {"oscillatorEnabled", "amplitudeEnvelopeEnabled",
+                           "unisonEnabled", "filterBankEnabled", "filterEnvEnabled",
                            "distortionEnabled", "chorusEnabled", "lfoEnabled"})
     {
         layout.add(std::make_unique<juce::AudioParameterBool>(
@@ -191,16 +202,17 @@ AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::s
     jassert(voiceFilterCutoffParameter != nullptr);
     jassert(filterEnvAmountParameter != nullptr); 
 
+    unisonCountParameter = apvts.getRawParameterValue("unisonCount");
+    unisonDetuneParameter = apvts.getRawParameterValue("unisonDetune");
+    jassert(unisonCountParameter != nullptr);
+    jassert(unisonDetuneParameter != nullptr);
     
     lpCutoffParameter = apvts.getRawParameterValue("lpCutoff");
     lpResonanceParameter = apvts.getRawParameterValue("lpResonance");
-
     hpCutoffParameter = apvts.getRawParameterValue("hpCutoff");
     hpResonanceParameter = apvts.getRawParameterValue("hpResonance");
-
     bpCutoffParameter = apvts.getRawParameterValue("bpCutoff");
     bpResonanceParameter = apvts.getRawParameterValue("bpResonance");
-
     lpMixParameter = apvts.getRawParameterValue("lpMix");
     hpMixParameter = apvts.getRawParameterValue("hpMix");
     bpMixParameter = apvts.getRawParameterValue("bpMix");
@@ -214,6 +226,11 @@ AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::s
     jassert(hpMixParameter != nullptr);
     jassert(bpMixParameter != nullptr);
     
+    oscillatorEnabledParameter = apvts.getRawParameterValue("oscillatorEnabled");
+    amplitudeEnvelopeEnabledParameter = apvts.getRawParameterValue("amplitudeEnvelopeEnabled");
+    unisonEnabledParameter = apvts.getRawParameterValue("unisonEnabled");
+    jassert(oscillatorEnabledParameter && amplitudeEnvelopeEnabledParameter && unisonEnabledParameter);
+
     lfoEnabledParameter = apvts.getRawParameterValue("lfoEnabled");
     lfoRateParameter = apvts.getRawParameterValue("lfoRate");
     lfoWaveformParameter = apvts.getRawParameterValue("lfoWaveform");
@@ -284,6 +301,122 @@ ObjectSynthAudioProcessor::getMapping(ModDestination destination, float maxCutof
         case ModDestination::Count: return {};
     }
     return {};
+}
+
+void ObjectSynthAudioProcessor::publishCustomFrames(
+    std::vector<CustomTable> frames,
+    std::vector<bool> seamWarnings,
+    const juce::String& name,
+    int selectedFrame)
+{
+    if (frames.empty() || frames.size() > 32)
+        return;
+
+    auto snapshot = std::make_unique<CustomWavetableSet>();
+    snapshot->frames = std::move(frames);
+    snapshot->seamWarnings = std::move(seamWarnings);
+    if (snapshot->seamWarnings.size() != snapshot->frames.size())
+        snapshot->seamWarnings.assign(snapshot->frames.size(), false);
+
+    const auto* publishedSet = snapshot.get();
+    const int index = juce::jlimit(
+        0, static_cast<int>(publishedSet->frames.size()) - 1, selectedFrame);
+
+    // This mutex is never used by the audio thread.
+    std::lock_guard<std::mutex> lock(customTableMutex);
+    customTableVersions.push_back(std::move(snapshot));
+    customWavetableName = name;
+    currentCustomSet.store(publishedSet, std::memory_order_release);
+    currentCustomFrame.store(index, std::memory_order_release);
+    customSeamWarning.store(publishedSet->seamWarnings[static_cast<std::size_t>(index)],
+                            std::memory_order_release);
+    currentCustomTable.store(&publishedSet->frames[static_cast<std::size_t>(index)],
+                             std::memory_order_release);
+}
+
+bool ObjectSynthAudioProcessor::selectCustomFrame(int frameIndex)
+{
+    // Called from the editor/message thread, never from processBlock().
+    std::lock_guard<std::mutex> lock(customTableMutex);
+    const auto* set = currentCustomSet.load(std::memory_order_acquire);
+    if (set == nullptr || frameIndex < 0 ||
+        frameIndex >= static_cast<int>(set->frames.size()))
+        return false;
+
+    const auto index = static_cast<std::size_t>(frameIndex);
+    currentCustomFrame.store(frameIndex, std::memory_order_release);
+    customSeamWarning.store(set->seamWarnings[index], std::memory_order_release);
+    currentCustomTable.store(&set->frames[index], std::memory_order_release);
+    return true;
+}
+
+bool ObjectSynthAudioProcessor::loadCustomWav(
+    const juce::File& file, juce::String& message)
+{
+    auto result = WavetableLoader::loadSingleCycleWav(file);
+    if (!result.success)
+    {
+        message = result.error;
+        return false;
+    }
+
+    const auto count = result.frames.size();
+    const bool firstWarning = result.seamWarning;
+    publishCustomFrames(std::move(result.frames),
+                        std::move(result.seamWarnings), file.getFileName());
+    setWaveform(Waveform::Custom);
+    message = "Wavetable loaded: " + file.getFileName() +
+        " (" + juce::String(static_cast<int>(count)) + " frame(s))";
+    if (firstWarning)
+        message += " - SEAM WARNING on frame 1";
+    return true;
+}
+
+juce::String ObjectSynthAudioProcessor::getCustomWavetableName() const
+{
+    std::lock_guard<std::mutex> lock(customTableMutex);
+    return customWavetableName;
+}
+
+bool ObjectSynthAudioProcessor::savePresetFile(
+    const juce::File& file, juce::String& message)
+{
+    juce::MemoryBlock data;
+    getStateInformation(data);
+    if (data.isEmpty() || !file.replaceWithData(data.getData(), data.getSize()))
+    {
+        message = "Could not write preset file";
+        return false;
+    }
+    message = "Preset saved";
+    return true;
+}
+
+bool ObjectSynthAudioProcessor::loadPresetFile(
+    const juce::File& file, juce::String& message)
+{
+    juce::MemoryBlock data;
+    if (!file.existsAsFile() || file.getSize() > 2 * 1024 * 1024 ||
+        !file.loadFileAsData(data) || data.isEmpty())
+    {
+        message = "Cannot read preset file";
+        return false;
+    }
+    if (data.getSize() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+    {
+        message = "Preset file is too large";
+        return false;
+    }
+    // Validate before mutating the running synth.
+    auto xml = getXmlFromBinary(data.getData(), static_cast<int>(data.getSize()));
+    if (xml == nullptr || !xml->hasTagName(apvts.state.getType()))
+    {
+        message = "Not a valid ObjectSynth preset";
+        return false;
+    }
+    setStateInformation(data.getData(), static_cast<int>(data.getSize()));
+    message = "Preset loaded";
+    return true;
 }
 
 void ObjectSynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerBlock)
@@ -372,6 +505,7 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                                              juce::MidiBuffer& midiMessages)
 {
     juce::ScopedNoDenormals noDenormals;
+
     buffer.clear();
     const int numSamples = buffer.getNumSamples();
     if (numSamples == 0) return;
@@ -396,14 +530,30 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         filterEnvSustainParameter->load(std::memory_order_relaxed),
         filterEnvReleaseParameter->load(std::memory_order_relaxed)
     };
+    const bool oscillatorEnabled =
+        oscillatorEnabledParameter->load(std::memory_order_relaxed) > 0.5f;
+    const bool amplitudeEnvelopeEnabled =
+        amplitudeEnvelopeEnabledParameter->load(std::memory_order_relaxed) > 0.5f;
+    const bool unisonEnabled =
+        unisonEnabledParameter->load(std::memory_order_relaxed) > 0.5f;
     const bool voiceFilterEnabled =
         filterEnvEnabledParameter->load(std::memory_order_relaxed) > 0.5f;
+
+    const int unisonCount = juce::roundToInt(unisonCountParameter -> load(std::memory_order_relaxed));
+    const float unisonDetune = unisonDetuneParameter -> load(std::memory_order_relaxed);
+
+    const auto* table = currentCustomTable.load(std::memory_order_acquire);
 
     for (int i = 0; i < synthesiser.getNumVoices(); ++i)
     {
         auto* voice = static_cast<SynthVoice*>(synthesiser.getVoice(i));
-        voice->setADSRParameters(amplitudeParameters);
-        voice->setVoiceFilterEnabled(voiceFilterEnabled);
+        voice -> setCustomWaveform(table);
+        voice -> setOscillatorEnabled(oscillatorEnabled);
+        voice -> setAmplitudeEnvelopeEnabled(amplitudeEnvelopeEnabled);
+        voice -> setUnisonEnabled(unisonEnabled);
+        voice -> setADSRParameters(amplitudeParameters);
+        voice -> setVoiceFilterEnabled(voiceFilterEnabled);
+        voice -> setUnisonParameters(unisonCount, unisonDetune);
     }
 
     // Read all APVTS values once per host block, on the audio thread.
@@ -423,9 +573,10 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         modulationMatrix.setRoute(i, {static_cast<ModDestination>(index), depth});
     }
 
-    const float maxCutoff = juce::jmax(20.0f,
-        juce::jmin(18000.0f, static_cast<float>(getSampleRate() * 0.45)));
+    const float maxCutoff = juce::jmax(20.0f, juce::jmin(18000.0f, static_cast<float>(getSampleRate() * 0.45)));
+
     std::array<ModulationMapping, ModulationMatrix::destinationCount> mappings {};
+    
     for (std::size_t i = 1; i < mappings.size(); ++i)
         mappings[i] = getMapping(static_cast<ModDestination>(i), maxCutoff);
 
@@ -433,8 +584,8 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     keyboardState.processNextMidiBuffer(midiMessages, 0, numSamples, true);
 
     std::array<float, ModulationMatrix::destinationCount> effective {};
-    const auto index = [](ModDestination destination) noexcept
-    {
+
+    const auto index = [](ModDestination destination) noexcept {
         return static_cast<std::size_t>(destination);
     };
 
@@ -537,24 +688,146 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 void ObjectSynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
 {
     auto state = apvts.copyState();
+
+    // APVTS state may contain properties from a previously restored preset.
+    // Build metadata from the live custom set, never from stale serialized data.
+    for (const auto* property : {"customWavetableData", "customWavetableName",
+                                 "customFrameIndex", "customWavetableSeamWarning"})
+        state.removeProperty(juce::Identifier(property), nullptr);
+
     state.setProperty("selectedWaveform", static_cast<int>(getWaveform()), nullptr);
+
+    {
+        std::lock_guard<std::mutex> lock(customTableMutex);
+        const auto* set = currentCustomSet.load(std::memory_order_acquire);
+        if (set != nullptr)
+        {
+            state.setProperty("customWavetableName", customWavetableName, nullptr);
+            state.setProperty("customFrameIndex",
+                              currentCustomFrame.load(std::memory_order_relaxed), nullptr);
+
+            juce::MemoryOutputStream stream;
+            stream.writeInt(2); // Multiframe preset format.
+            stream.writeInt(static_cast<int>(set->frames.size()));
+            for (std::size_t i = 0; i < set->frames.size(); ++i)
+            {
+                stream.writeByte(set->seamWarnings[i] ? 1 : 0);
+                for (const float sample : set->frames[i])
+                    stream.writeFloat(sample);
+            }
+
+            juce::MemoryBlock bytes(stream.getData(), stream.getDataSize());
+            state.setProperty("customWavetableData", bytes.toBase64Encoding(), nullptr);
+        }
+    }
+
     if (auto xml = state.createXml())
         copyXmlToBinary(*xml, destData);
 }
 
 void ObjectSynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
-    if (auto xml = getXmlFromBinary(data, sizeInBytes))
+    auto xml = getXmlFromBinary(data, sizeInBytes);
+    if (xml == nullptr || !xml->hasTagName(apvts.state.getType()))
+        return;
+    auto restored = juce::ValueTree::fromXml(*xml);
+    if (!restored.isValid())
+        return;
+
+    // Retain all old snapshots: active notes may still be reading them.
     {
-        if (xml->hasTagName(apvts.state.getType()))
+        std::lock_guard<std::mutex> lock(customTableMutex);
+        currentCustomSet.store(nullptr, std::memory_order_release);
+        currentCustomTable.store(nullptr, std::memory_order_release);
+        currentCustomFrame.store(0, std::memory_order_release);
+        customSeamWarning.store(false, std::memory_order_release);
+        customWavetableName.clear();
+    }
+
+    const auto encoded = restored.getProperty("customWavetableData").toString();
+    if (encoded.isNotEmpty())
+    {
+        juce::MemoryBlock bytes;
+        if (bytes.fromBase64Encoding(encoded) && bytes.getSize() >= sizeof(juce::int32))
         {
-            auto restored = juce::ValueTree::fromXml(*xml);
-            const int waveform = juce::jlimit(0, 3,
-                static_cast<int>(restored.getProperty("selectedWaveform", 1)));
-            apvts.replaceState(restored);
-            setWaveform(static_cast<Waveform>(waveform));
+            juce::MemoryInputStream stream(bytes, false);
+            const int version = stream.readInt();
+            int count = 0;
+            bool validSize = false;
+
+            if (version == 1)
+            {
+                // Compatibility with the previous single-cycle preset format.
+                count = 1;
+                validSize = bytes.getSize() ==
+                    sizeof(juce::int32) + WavetableBank::tableSize * sizeof(float);
+            }
+            else if (version == 2 && bytes.getSize() >= 2 * sizeof(juce::int32))
+            {
+                count = stream.readInt();
+                if (count >= 1 && count <= 32)
+                {
+                    const std::size_t perFrame = 1 +
+                        WavetableBank::tableSize * sizeof(float);
+                    validSize = bytes.getSize() ==
+                        2 * sizeof(juce::int32) + static_cast<std::size_t>(count) * perFrame;
+                }
+            }
+
+            if (validSize)
+            {
+                std::vector<CustomTable> frames;
+                std::vector<bool> warnings;
+                frames.reserve(static_cast<std::size_t>(count));
+                warnings.reserve(static_cast<std::size_t>(count));
+                bool valid = true;
+
+                for (int i = 0; i < count; ++i)
+                {
+                    const bool warning = version == 2
+                        ? stream.readByte() != 0
+                        : static_cast<bool>(restored.getProperty(
+                              "customWavetableSeamWarning", false));
+                    CustomTable table{};
+                    float peak = 0.0f;
+                    for (float& sample : table)
+                    {
+                        sample = stream.readFloat();
+                        valid = valid && std::isfinite(sample);
+                        peak = std::max(peak, std::abs(sample));
+                    }
+                    valid = valid && peak > 1.0e-6f && peak <= 1.01f;
+                    frames.push_back(std::move(table));
+                    warnings.push_back(warning);
+                }
+
+                if (valid)
+                {
+                    publishCustomFrames(
+                        std::move(frames), std::move(warnings),
+                        restored.getProperty("customWavetableName",
+                                             "Restored custom wavetable").toString(),
+                        static_cast<int>(restored.getProperty("customFrameIndex", 0)));
+                }
+            }
         }
     }
+
+    const int waveform = juce::jlimit(
+        0, static_cast<int>(Waveform::Custom),
+        static_cast<int>(restored.getProperty("selectedWaveform", 1)));
+
+    // These fields belong to the immutable wavetable snapshots, not APVTS.
+    // Avoid keeping a large, possibly stale Base64 blob inside APVTS state.
+    for (const auto* property : {"customWavetableData", "customWavetableName",
+                                 "customFrameIndex", "customWavetableSeamWarning"})
+        restored.removeProperty(juce::Identifier(property), nullptr);
+
+    apvts.replaceState(restored);
+    setWaveform(waveform == static_cast<int>(Waveform::Custom) &&
+                        currentCustomTable.load(std::memory_order_acquire) == nullptr
+                    ? Waveform::Sawtooth
+                    : static_cast<Waveform>(waveform));
 }
 
 juce::AudioProcessorEditor* ObjectSynthAudioProcessor::createEditor(){

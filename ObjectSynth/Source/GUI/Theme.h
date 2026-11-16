@@ -16,6 +16,17 @@ namespace osui
     inline juce::Colour orange()     { return juce::Colour::fromRGB(252, 180, 98); }
     inline juce::Colour purple()     { return juce::Colour::fromRGB(177, 146, 255); }
 
+    // Height of the caption drawn above an inline knob's value box.
+    constexpr int inlineCaptionHeight = 15;
+
+    // Marks a rotary slider whose value box sits to the right of the dial,
+    // with its caption above the box (see positionKnobInline()).
+    inline const juce::Identifier& inlineKnobProperty()
+    {
+        static const juce::Identifier id { "osInlineKnob" };
+        return id;
+    }
+
     class LookAndFeel final : public juce::LookAndFeel_V4
     {
     public:
@@ -35,26 +46,28 @@ namespace osui
                               float position, float startAngle, float endAngle,
                               juce::Slider& slider) override
         {
-            const float cx = static_cast<float>(x + width / 2);
-            const float cy = static_cast<float>(y + height / 2);
-            const float radius = juce::jmin(static_cast<float>(width), static_cast<float>(height)) * 0.37f;
-            if (radius < 7.0f)
+            const float cx = static_cast<float>(x) + static_cast<float>(width) * 0.5f;
+            const float cy = static_cast<float>(y) + static_cast<float>(height) * 0.5f;
+            const float radius = juce::jmin(static_cast<float>(width), static_cast<float>(height)) * 0.41f;
+            if (radius < 6.0f)
                 return;
 
             const float angle = startAngle + position * (endAngle - startAngle);
             auto accent = slider.findColour(juce::Slider::rotarySliderFillColourId);
+            // Arc thickness follows the dial size so small and large knobs match.
+            const float stroke = juce::jlimit(2.5f, 4.0f, radius * 0.17f);
 
             juce::Path track;
             track.addCentredArc(cx, cy, radius, radius, 0.0f, startAngle, endAngle, true);
             g.setColour(panelEdge().brighter(0.25f));
-            g.strokePath(track, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved,
+            g.strokePath(track, juce::PathStrokeType(stroke, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
 
             juce::Path value;
             value.addCentredArc(cx, cy, radius, radius, 0.0f, startAngle,
                                 juce::jmax(startAngle + 0.001f, angle), true);
             g.setColour(accent);
-            g.strokePath(value, juce::PathStrokeType(4.0f, juce::PathStrokeType::curved,
+            g.strokePath(value, juce::PathStrokeType(stroke, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
 
             g.setColour(juce::Colour::fromRGB(34, 48, 66));
@@ -67,7 +80,42 @@ namespace osui
             const auto needle = juce::Point<float>(cx + std::sin(angle) * radius * 0.60f,
                                                    cy - std::cos(angle) * radius * 0.60f);
             g.setColour(text());
-            g.drawLine(cx, cy, needle.x, needle.y, 2.8f);
+            g.drawLine(cx, cy, needle.x, needle.y, juce::jlimit(2.0f, 2.8f, radius * 0.12f));
+        }
+
+        // Inline knobs: dial on the left, caption + value box stacked on the right.
+        juce::Slider::SliderLayout getSliderLayout(juce::Slider& slider) override
+        {
+            if (! static_cast<bool>(slider.getProperties()[inlineKnobProperty()]))
+                return juce::LookAndFeel_V4::getSliderLayout(slider);
+
+            const auto bounds = slider.getLocalBounds();
+            const int boxWidth = juce::jmin(slider.getTextBoxWidth(), bounds.getWidth() / 2);
+            const int boxHeight = juce::jmin(slider.getTextBoxHeight(), bounds.getHeight());
+            const int groupTop = (bounds.getHeight() - (inlineCaptionHeight + boxHeight)) / 2;
+
+            juce::Slider::SliderLayout layout;
+            layout.textBoxBounds = { bounds.getWidth() - boxWidth,
+                                     juce::jmax(0, groupTop + inlineCaptionHeight),
+                                     boxWidth, boxHeight };
+            layout.sliderBounds = bounds.withTrimmedRight(boxWidth + 6);
+            return layout;
+        }
+
+        // Fixed, legible menu text: JUCE otherwise scales it with the box height.
+        juce::Font getComboBoxFont(juce::ComboBox&) override
+        {
+            return juce::Font(juce::FontOptions(13.0f));
+        }
+
+        juce::Font getPopupMenuFont() override
+        {
+            return juce::Font(juce::FontOptions(14.0f));
+        }
+
+        juce::Font getTextButtonFont(juce::TextButton&, int buttonHeight) override
+        {
+            return juce::Font(juce::FontOptions(juce::jmin(14.0f, static_cast<float>(buttonHeight) * 0.5f)));
         }
     };
 
@@ -141,10 +189,50 @@ namespace osui
         control.attachment = std::make_unique<SliderAttachment>(apvts, id, control.slider);
     }
 
-    inline void positionKnob(Knob& knob, juce::Rectangle<int> area)
+    // Classic stacked knob: caption, dial, value box. The dial is capped at
+    // maxDial so knobs keep a consistent size across panels of different
+    // heights; the group is centred vertically inside its cell.
+    inline void positionKnob(Knob& knob, juce::Rectangle<int> area, int maxDial = 56)
     {
-        knob.label.setBounds(area.removeFromTop(17));
-        knob.slider.setBounds(area);
+        const bool hasCaption = knob.label.getText().isNotEmpty();
+        const int captionHeight = hasCaption ? 16 : 0;
+        const int boxHeight = knob.slider.getTextBoxHeight();
+        const int dial = juce::jmax(0, juce::jmin(maxDial, area.getWidth(),
+                                                  area.getHeight() - captionHeight - boxHeight - 2));
+        auto stack = area.withSizeKeepingCentre(area.getWidth(),
+                                                captionHeight + dial + 2 + boxHeight);
+        knob.label.setBounds(hasCaption ? stack.removeFromTop(captionHeight)
+                                        : juce::Rectangle<int>());
+        knob.slider.setBounds(stack);
+    }
+
+    // Switches a knob to the compact inline style used in narrow panels.
+    inline void makeKnobInline(Knob& knob, int boxWidth, int boxHeight = 20)
+    {
+        knob.slider.setTextBoxStyle(juce::Slider::TextBoxRight, false, boxWidth, boxHeight);
+        knob.slider.getProperties().set(inlineKnobProperty(), true);
+        knob.label.setFont(juce::Font(juce::FontOptions(10.5f)));
+    }
+
+    // Inline knob: [dial] [CAPTION / value]. The caption is a sibling label
+    // placed exactly above the value box computed by LookAndFeel::getSliderLayout.
+    inline void positionKnobInline(Knob& knob, juce::Rectangle<int> area, int maxDial = 50)
+    {
+        const int boxWidth = knob.slider.getTextBoxWidth();
+        const int boxHeight = knob.slider.getTextBoxHeight();
+        const int dial = juce::jmax(0, juce::jmin(maxDial, area.getHeight(),
+                                                  area.getWidth() - boxWidth - 6));
+        const int width = juce::jmin(area.getWidth(), dial + 6 + boxWidth);
+        const int height = juce::jmin(area.getHeight(),
+                                      juce::jmax(dial, inlineCaptionHeight + boxHeight));
+        const auto group = area.withSizeKeepingCentre(width, height);
+        knob.slider.setBounds(group);
+
+        const int captionTop = group.getY()
+            + (group.getHeight() - (inlineCaptionHeight + boxHeight)) / 2;
+        knob.label.setBounds(group.getRight() - juce::jmin(boxWidth, group.getWidth() / 2),
+                             captionTop, juce::jmin(boxWidth, group.getWidth() / 2),
+                             inlineCaptionHeight);
     }
 
     inline void drawPlot(juce::Graphics& g, juce::Rectangle<float> rect)
@@ -182,7 +270,8 @@ namespace osui
             g.setColour(text());
             g.setFont(15.0f);
             g.drawText(heading, 16, 10, getWidth() - 32, 21, juce::Justification::centredLeft);
-            if (detail.isNotEmpty())
+            // The upper-right header is reserved for the power switch.
+            if (detail.isNotEmpty() && powerIndicator == nullptr)
             {
                 g.setColour(muted());
                 g.setFont(10.5f);
@@ -192,6 +281,28 @@ namespace osui
         }
 
     protected:
+        // Only visual: the audio bypass is controlled by the matching APVTS
+        // bool parameter. The button remains clickable while the module is off.
+        void setPowerIndicator(PowerButton& button)
+        {
+            powerIndicator = &button;
+            button.onStateChange = [this] { repaint(); };
+        }
+
+        void paintOverChildren(juce::Graphics& g) override
+        {
+            if (powerIndicator == nullptr || powerIndicator->getToggleState())
+                return;
+
+            // Cover just the module body; keep the ON/OFF switch fully legible.
+            auto body = getLocalBounds().reduced(2).withTrimmedTop(38);
+            if (body.isEmpty())
+                return;
+
+            g.setColour(background().withAlpha(0.57f));
+            g.fillRoundedRectangle(body.toFloat(), 9.0f);
+        }
+
         juce::Rectangle<int> getBodyBounds() const
         {
             auto bounds = getLocalBounds().reduced(12);
@@ -201,5 +312,6 @@ namespace osui
 
     private:
         juce::String heading, detail;
+        PowerButton* powerIndicator = nullptr; // non-owning; member of panel
     };
 }

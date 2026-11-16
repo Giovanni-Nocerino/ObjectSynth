@@ -4,9 +4,14 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 #include <atomic>
+#include <mutex>
+#include <memory>
+#include <vector>
 
 #include "Synth/SynthSound.h"
 #include "Synth/WavetableOscillator.h"
+#include "Synth/WavetableBank.h"
+#include "Synth/WavetableLoader.h"
 #include "DSP/FilterBank.h"
 #include "DSP/LFO.h"
 #include "DSP/ControlRateScheduler.h"
@@ -44,15 +49,44 @@ public:
 
     juce::MidiKeyboardState& getKeyboardState() noexcept { return keyboardState; }
 
-    void setWaveform(Waveform newWaveform) noexcept
-    {
+    void setWaveform(Waveform newWaveform) noexcept {
         requestedWaveform.store(newWaveform, std::memory_order_relaxed);
     }
 
-    Waveform getWaveform() const noexcept
-    {
+    Waveform getWaveform() const noexcept {
         return requestedWaveform.load(std::memory_order_relaxed);
     }
+
+    bool loadCustomWav(const juce::File& file, juce::String& message);
+    bool selectCustomFrame(int frameIndex);
+    int getCustomFrameIndex() const noexcept
+    {
+        return currentCustomFrame.load(std::memory_order_acquire);
+    }
+    int getCustomFrameCount() const noexcept
+    {
+        const auto* set = currentCustomSet.load(std::memory_order_acquire);
+        return set != nullptr ? static_cast<int>(set->frames.size()) : 0;
+    }
+
+    // For GUI display only. Immutable snapshots are retained for the life of the processor.
+    const WavetableBank::Table* getCustomWavetableForUI() const noexcept
+    {
+        return currentCustomTable.load(std::memory_order_acquire);
+    }
+    bool hasCustomWavetable() const noexcept
+    {
+        return getCustomWavetableForUI() != nullptr;
+    }
+    bool getCustomSeamWarning() const noexcept
+    {
+        return customSeamWarning.load(std::memory_order_acquire);
+    }
+    juce::String getCustomWavetableName() const;
+
+    // Portable user preset files. Never call these from the audio thread.
+    bool savePresetFile(const juce::File& file, juce::String& message);
+    bool loadPresetFile(const juce::File& file, juce::String& message);
 
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
 
@@ -76,6 +110,27 @@ private:
 
     ModulationMapping getMapping(ModDestination destination, float maxCutoff) const noexcept;
 
+    using CustomTable = WavetableBank::Table;
+    struct CustomWavetableSet
+    {
+        std::vector<CustomTable> frames;
+        std::vector<bool> seamWarnings;
+    };
+
+    // Snapshots are immutable once published. Old snapshots stay alive so
+    // previously triggered voices can finish without accessing freed data.
+    std::atomic<const CustomWavetableSet*> currentCustomSet {nullptr};
+    std::atomic<const CustomTable*> currentCustomTable {nullptr};
+    std::atomic<int> currentCustomFrame {0};
+    std::vector<std::unique_ptr<const CustomWavetableSet>> customTableVersions;
+    mutable std::mutex customTableMutex;
+    juce::String customWavetableName;
+    std::atomic<bool> customSeamWarning {false};
+    void publishCustomFrames(std::vector<CustomTable> frames,
+                             std::vector<bool> seamWarnings,
+                             const juce::String& name,
+                             int selectedFrame = 0);
+
     juce::Synthesiser synthesiser;
     std::atomic<Waveform> requestedWaveform { Waveform::Sawtooth };
     Waveform appliedWaveform = Waveform::Sawtooth;
@@ -93,7 +148,6 @@ private:
     std::atomic<float>* sustainParameter = nullptr;
     std::atomic<float>* releaseParameter = nullptr;
 
-    // Preserve original IDs (including these C++ member names) for compatibility.
     std::atomic<float>* distortioDriveParameter = nullptr;
     std::atomic<float>* distortioMixParameter = nullptr;
 
@@ -119,6 +173,12 @@ private:
     std::atomic<float>* hpMixParameter = nullptr;
     std::atomic<float>* bpMixParameter = nullptr;
 
+    std::atomic<float>* unisonCountParameter = nullptr;
+    std::atomic<float>* unisonDetuneParameter = nullptr;
+
+    std::atomic<float>* oscillatorEnabledParameter = nullptr;
+    std::atomic<float>* amplitudeEnvelopeEnabledParameter = nullptr;
+    std::atomic<float>* unisonEnabledParameter = nullptr;
     std::atomic<float>* lfoEnabledParameter = nullptr;
     std::atomic<float>* lfoRateParameter = nullptr;
     std::atomic<float>* lfoWaveformParameter = nullptr;

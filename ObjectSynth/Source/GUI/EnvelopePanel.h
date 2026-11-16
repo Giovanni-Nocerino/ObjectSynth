@@ -16,6 +16,8 @@ namespace osui
             for (std::size_t i = 0; i < knobs.size(); ++i)
                 setupKnob(*this, knobs[i], state, ids[i], names[i], cyan(),
                           i == 2 ? "" : " s");
+            setupPowerButton(*this, power, powerAttachment, state, "amplitudeEnvelopeEnabled");
+            setPowerIndicator(power);
             startTimerHz(24); // Host automation may change values outside the editor.
         }
 
@@ -74,16 +76,18 @@ namespace osui
 
         void resized() override
         {
-            // Wide envelope preview on the left; four consistent knobs on the right.
+            power.setBounds(getWidth() - 70, 9, 55, 22);
+            // Sketch: wide ADSR display on top, the four knobs in one row below.
             auto body = getBodyBounds();
-            plotArea = body.removeFromLeft(static_cast<int>(body.getWidth() * 0.55f));
-            body.removeFromLeft(10);
+            auto knobRow = body.removeFromBottom(84);
+            body.removeFromBottom(8);
+            plotArea = body;
 
-            const int width = body.getWidth() / static_cast<int>(knobs.size());
+            const int width = knobRow.getWidth() / static_cast<int>(knobs.size());
             for (std::size_t i = 0; i < knobs.size(); ++i)
             {
-                auto cell = i + 1 == knobs.size() ? body : body.removeFromLeft(width);
-                positionKnob(knobs[i], cell);
+                auto cell = i + 1 == knobs.size() ? knobRow : knobRow.removeFromLeft(width);
+                positionKnob(knobs[i], cell, 48);
             }
         }
 
@@ -91,6 +95,8 @@ namespace osui
         void timerCallback() override { repaint(plotArea); }
 
         std::array<Knob, 4> knobs;
+        PowerButton power;
+        std::unique_ptr<ButtonAttachment> powerAttachment;
         juce::Rectangle<int> plotArea;
     };
 }

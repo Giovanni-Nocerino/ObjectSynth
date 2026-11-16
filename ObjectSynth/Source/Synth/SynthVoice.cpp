@@ -14,13 +14,31 @@ void SynthVoice::startNote(int midiNoteNumber, float velocity, juce::Synthesiser
 
     const double frequency = juce::MidiMessage::getMidiNoteInHertz(midiNoteNumber);
     
-    oscillator.setFrequency(frequency);
+    activeUnisonCount = pendingUnisonEnabled ? pendindUnisonCount : 1;
+
+    for (int i = 0; i < activeUnisonCount; ++i){
+
+        const double position = activeUnisonCount == 1 ? 0.0 : 2.0 * static_cast<double>(i)/static_cast<double>(activeUnisonCount - 1) -1.0;
+        const double cents = position * static_cast<double>(pendingDetuneCents);
+        const double detuneFrequency = frequency * std::exp2(cents/1200.0);
+
+        auto& oscillator = oscillators[static_cast<std::size_t>(i)];
+        oscillator.setWaveform(pendingWaveform);
+        oscillator.setCustomTable(pendingCustomTable);
+        oscillator.setFrequency(detuneFrequency);
+    }
+    
+
     voiceLowPass.reset();
 
     noteGain = velocity * 0.1f;
     
     envelope.reset();
-    envelope.setParameters(pendingADSRParameters);
+    // Bypassing ADSR means a constant-level note with short anti-click
+    // transitions. The note still ends correctly on MIDI Note Off.
+    const juce::ADSR::Parameters gatedParameters {0.003f, 0.003f, 1.0f, 0.003f};
+    envelope.setParameters(pendingAmplitudeEnvelopeEnabled
+                               ? pendingADSRParameters : gatedParameters);
     envelope.noteOn();
 
     filterEnvelope.reset();
@@ -58,7 +76,13 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int sta
 
         const float filterEnvValue = filterEnvelope.getNextSample();
 
-        const float oscillatorValue = oscillator.getNextSample();
+        float oscillatorValue = 0.0f;
+
+        for (int i = 0; i < activeUnisonCount; ++i){
+            oscillatorValue += oscillators[static_cast<std::size_t>(i)].getNextSample();
+        }
+
+        oscillatorValue /= static_cast<float>(activeUnisonCount);
 
         float filteredValue = oscillatorValue;
         const float filterWet = voiceFilterMix.getNextValue();
@@ -75,7 +99,8 @@ void SynthVoice::renderNextBlock(juce::AudioBuffer<float>& outputBuffer, int sta
                 : oscillatorValue + filterWet * (processed - oscillatorValue);
         }
 
-        const float value = filteredValue * envelopeValue * noteGain;
+        const float value = filteredValue * envelopeValue * noteGain
+                          * oscillatorGate.getNextValue();
 
         for (int channel = 0; channel < outputBuffer.getNumChannels(); ++channel){
             outputBuffer.addSample(channel, startSample + i, value);
@@ -94,7 +119,9 @@ void SynthVoice::setCurrentPlaybackSampleRate(
     if (newSampleRate <= 0.0)
         return;
 
-    oscillator.prepare(newSampleRate);
+    for (auto& oscillator : oscillators){
+        oscillator.prepare(newSampleRate);
+    }
 
     envelope.setSampleRate(newSampleRate);
     envelope.reset();
@@ -111,6 +138,8 @@ void SynthVoice::setCurrentPlaybackSampleRate(
     voiceLowPass.setCutoffFrequency(800.0f);
     voiceLowPass.setResonance(0.7071f);
     voiceLowPass.reset();
+    oscillatorGate.reset(newSampleRate, 0.005);
+    oscillatorGate.setCurrentAndTargetValue(1.0f);
     voiceFilterMix.reset(newSampleRate, 0.005);
     voiceFilterMix.setCurrentAndTargetValue(voiceLowPassEnabled ? 1.0f : 0.0f);
 }

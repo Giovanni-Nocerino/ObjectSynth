@@ -4,24 +4,29 @@
 
 namespace osui
 {
+    // Sketch: Distortion and Chorus share the narrow lower-left column, so
+    // both use inline knobs (dial left, caption + value right).
     class DistortionPanel final : public ModulePanel
     {
     public:
         explicit DistortionPanel(APVTS& state)
-            : ModulePanel("DISTORTION")
+            : ModulePanel("DIST.")
         {
             setupKnob(*this, knobs[0], state, "distortionDrive", "DRIVE", orange(), " x");
             setupKnob(*this, knobs[1], state, "distortionMix", "DRY / WET", orange());
+            for (auto& knob : knobs)
+                makeKnobInline(knob, 66);
             setupPowerButton(*this, power, powerAttachment, state, "distortionEnabled");
+            setPowerIndicator(power);
         }
 
         void resized() override
         {
-            power.setBounds(getWidth() - 64, 9, 50, 22);
+            power.setBounds(getWidth() - 70, 9, 55, 22);
             auto area = getBodyBounds();
             const int width = area.getWidth() / 2;
-            positionKnob(knobs[0], area.removeFromLeft(width));
-            positionKnob(knobs[1], area);
+            positionKnobInline(knobs[0], area.removeFromLeft(width), 46);
+            positionKnobInline(knobs[1], area, 46);
         }
 
     private:
@@ -40,23 +45,27 @@ namespace osui
             setupKnob(*this, knobs[1], state, "chorusDepth", "DEPTH", purple());
             setupKnob(*this, knobs[2], state, "chorusDelay", "DELAY", purple(), " ms");
             setupKnob(*this, knobs[3], state, "chorusMix", "DRY / WET", purple());
+            for (auto& knob : knobs)
+                makeKnobInline(knob, 66);
             setupPowerButton(*this, power, powerAttachment, state, "chorusEnabled");
+            setPowerIndicator(power);
         }
 
         void resized() override
         {
-            power.setBounds(getWidth() - 64, 9, 50, 22);
+            power.setBounds(getWidth() - 70, 9, 55, 22);
             auto area = getBodyBounds();
             const int rowHeight = area.getHeight() / 2;
-            
-            for (int row = 0; row < 2; ++row) {
-                
+
+            for (int row = 0; row < 2; ++row)
+            {
                 auto currentRow = row == 0 ? area.removeFromTop(rowHeight) : area;
                 const int knobWidth = currentRow.getWidth() / 2;
 
-                for (int col = 0; col < 2; ++col) {
+                for (int col = 0; col < 2; ++col)
+                {
                     auto cell = col == 0 ? currentRow.removeFromLeft(knobWidth) : currentRow;
-                    positionKnob(knobs[row * 2 + col], cell);
+                    positionKnobInline(knobs[static_cast<std::size_t>(row * 2 + col)], cell, 46);
                 }
             }
         }

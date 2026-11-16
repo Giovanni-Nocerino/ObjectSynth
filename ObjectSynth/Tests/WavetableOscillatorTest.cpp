@@ -42,7 +42,7 @@ int main()
 
 
 
-    WavetableOscillator interpolationOsc(8);
+    WavetableOscillator interpolationOsc;
 
     interpolationOsc.prepare(8.0);
     interpolationOsc.setFrequency(0.5);

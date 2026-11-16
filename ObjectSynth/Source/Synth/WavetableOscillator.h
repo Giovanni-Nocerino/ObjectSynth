@@ -1,39 +1,45 @@
 #pragma once
 
-#include <vector>
-#include <array>
-
-enum class Waveform{
-    Sine,
-    Sawtooth,
-    Square,
-    Triangle
-};
+#include "WavetableBank.h"
+#include <cstddef>
 
 class WavetableOscillator {
-    public:
-        explicit WavetableOscillator(std::size_t size = 2048);
+public:
+    WavetableOscillator() noexcept = default;
 
-        std::size_t getSize() const noexcept;
-        
-        void prepare(double newSampleRate);
-        
-        void setFrequency(double newFrequency);
+    explicit WavetableOscillator(const WavetableBank& data) noexcept : bank(&data) {}
 
-        float getNextSample() noexcept;
+    std::size_t getSize() const noexcept {
+        return WavetableBank::tableSize;
+    }
 
-        void setWaveform(Waveform newWaveform) noexcept{
-            waveform = newWaveform;
-        }
+    void prepare(double newSampleRate);
 
-    private:
-        std::array<std::vector<float>,4> waveTable;
-        Waveform waveform = Waveform::Sawtooth;
-        
-        double sampleRate = 48000.0;
-        double frequency = 0.0;
+    void setFrequency(double newFrequency);
 
-        double readPosition = 0.0;
-        double readIncrement = 0.0;
+    float getNextSample() noexcept;
 
+    void setWaveform(Waveform newWaveform) noexcept {
+        waveform = newWaveform;
+    }
+
+    void resetPhase() noexcept {
+        readPosition = 0.0;
+    }
+
+    void setCustomTable(const WavetableBank::Table* table) noexcept{
+        customTable = table;
+    }
+
+private:
+    const WavetableBank* bank = &WavetableBank::builtIn();
+    const WavetableBank::Table* customTable = nullptr;
+
+    Waveform waveform = Waveform::Sawtooth;
+
+    double sampleRate = 48000.0;
+    double frequency = 0.0;
+
+    double readPosition = 0.0;
+    double readIncrement = 0.0;
 };
