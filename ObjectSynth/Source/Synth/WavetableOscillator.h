@@ -1,6 +1,7 @@
 #pragma once
 
 #include "WavetableBank.h"
+#include <cmath>
 #include <cstddef>
 
 class WavetableOscillator {
@@ -25,6 +26,12 @@ public:
 
     void resetPhase() noexcept {
         readPosition = 0.0;
+    }
+
+    // Phase as a fraction of one cycle, [0, 1).
+    void setPhase(double cycles) noexcept {
+        const double wrapped = cycles - std::floor(cycles);
+        readPosition = std::isfinite(wrapped) ? wrapped * static_cast<double>(getSize()) : 0.0;
     }
 
     void setCustomTable(const WavetableBank::Table* table) noexcept{

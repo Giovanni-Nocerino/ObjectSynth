@@ -27,6 +27,13 @@ namespace osui
         return id;
     }
 
+    // Marks a rotary slider whose value arc starts at the centre (Pan).
+    inline const juce::Identifier& bipolarKnobProperty()
+    {
+        static const juce::Identifier id { "osBipolarKnob" };
+        return id;
+    }
+
     class LookAndFeel final : public juce::LookAndFeel_V4
     {
     public:
@@ -63,9 +70,13 @@ namespace osui
             g.strokePath(track, juce::PathStrokeType(stroke, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
 
+            // Bipolar knobs (e.g. Pan) fill from the centre, not from the minimum.
+            const bool bipolar = static_cast<bool>(slider.getProperties()[bipolarKnobProperty()]);
+            const float arcFrom = bipolar ? 0.5f * (startAngle + endAngle) : startAngle;
             juce::Path value;
-            value.addCentredArc(cx, cy, radius, radius, 0.0f, startAngle,
-                                juce::jmax(startAngle + 0.001f, angle), true);
+            value.addCentredArc(cx, cy, radius, radius, 0.0f,
+                                juce::jmin(arcFrom, angle),
+                                juce::jmax(arcFrom, angle) + 0.001f, true);
             g.setColour(accent);
             g.strokePath(value, juce::PathStrokeType(stroke, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
