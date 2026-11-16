@@ -11,7 +11,7 @@ namespace osui
     {
     public:
         explicit FilterBankPanel(APVTS& state, juce::AudioProcessor& owner)
-            : ModulePanel("FILTER BANK", "3 PARALLEL FILTERS  /  FREQUENCY RESPONSE"),
+            : ModulePanel("FILTER BANK"),
               processor(owner)
         {
             constexpr const char* ids[3][3] = {
@@ -24,6 +24,8 @@ namespace osui
                 for (std::size_t j = 0; j < controls[i].size(); ++j)
                     setupKnob(*this, controls[i][j], state, ids[i][j], names[j],
                               branchColour(i), j == 0 ? " Hz" : "");
+
+            setupPowerButton(*this, power, powerAttachment, state, "filterBankEnabled");
 
             // Only the UI timer repaints these graphs; the audio thread never draws.
             startTimerHz(24);
@@ -58,6 +60,7 @@ namespace osui
         {
             // Dedicated large plot on the left, all nine knobs in three compact
             // LP/HP/BP rows on the right. The editor dimensions are fixed.
+            power.setBounds(getWidth() - 70, 9, 55, 22);
             auto area = getBodyBounds();
             plotArea = area.removeFromLeft(628);
             area.removeFromLeft(12);
@@ -238,6 +241,8 @@ namespace osui
         }
 
         juce::AudioProcessor& processor;
+        PowerButton power;
+        std::unique_ptr<ButtonAttachment> powerAttachment;
         std::array<std::array<Knob, 3>, 3> controls;
         std::array<juce::Rectangle<int>, 3> rows;
         juce::Rectangle<int> plotArea;

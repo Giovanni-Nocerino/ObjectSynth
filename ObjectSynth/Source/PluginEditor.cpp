@@ -8,26 +8,33 @@ ObjectSynthAudioProcessorEditor::ObjectSynthAudioProcessorEditor(
       filterPanel(processor.getAPVTS(), processor),
       distortionPanel(processor.getAPVTS()),
       chorusPanel(processor.getAPVTS()),
-      midiKeyboard(processor.getKeyboardState(),
-                   juce::MidiKeyboardComponent::horizontalKeyboard)
+      filterEnvelopePanel(processor.getAPVTS()),
+      lfoPanel(processor.getAPVTS(), processor),
+      midiKeyboard(processor.getKeyboardState(), juce::MidiKeyboardComponent::horizontalKeyboard)
 {
     setLookAndFeel(&theme);
 
-    addAndMakeVisible(oscillatorPanel);
-    addAndMakeVisible(envelopePanel);
-    addAndMakeVisible(filterPanel);
-    addAndMakeVisible(distortionPanel);
-    addAndMakeVisible(chorusPanel);
+    addAndMakeVisible(uiCanvas);
 
-    addAndMakeVisible(midiKeyboard);
+    uiCanvas.addAndMakeVisible(oscillatorPanel);
+    uiCanvas.addAndMakeVisible(envelopePanel);
+    uiCanvas.addAndMakeVisible(filterPanel);
+    uiCanvas.addAndMakeVisible(distortionPanel);
+    uiCanvas.addAndMakeVisible(chorusPanel);
+    uiCanvas.addAndMakeVisible(filterEnvelopePanel);
+    uiCanvas.addAndMakeVisible(lfoPanel);
+
+    uiCanvas.addAndMakeVisible(midiKeyboard);
     midiKeyboard.setAvailableRange(48, 95);
     midiKeyboard.setLowestVisibleKey(48);
     midiKeyboard.setScrollButtonsVisible(false);
     midiKeyboard.setMouseClickGrabsKeyboardFocus(true);
 
     // A fixed canvas keeps the graphs legible and avoids distorted layouts.
-    setResizable(false, false);
-    setSize(1160, 1000);
+    setResizable(true, true);
+    setResizeLimits(816, 612, 1920, 1440);
+    getConstrainer()->setFixedAspectRatio(4.0 / 3.0);
+    setSize(1156, 867);
 }
 
 ObjectSynthAudioProcessorEditor::~ObjectSynthAudioProcessorEditor()
@@ -42,44 +49,73 @@ void ObjectSynthAudioProcessorEditor::paint(juce::Graphics& g)
 
 void ObjectSynthAudioProcessorEditor::resized()
 {
+    // 1. Calculate a uniform scale factor.
+    const float scaleX = static_cast<float>(getWidth()) / designWidth;
+    const float scaleY = static_cast<float>(getHeight()) / designHeight;
+    const float scale = juce::jmin(scaleX, scaleY);
+
+    // 2. Centre and scale the logical canvas.
+    const float offsetX =(getWidth() - designWidth * scale) * 0.5f;
+    const float offsetY =(getHeight() - designHeight * scale) * 0.5f;
+
+    uiCanvas.setBounds(0, 0, designWidth, designHeight);
+    uiCanvas.setTransform(juce::AffineTransform::scale(scale).translated(offsetX, offsetY));
+
+    // 3. Layout in logical coordinates.
     constexpr int gap = 10;
-    auto area = getLocalBounds().reduced(14);
+    auto area = uiCanvas.getLocalBounds().reduced(14);
 
-    // The keyboard is always visible and no Play/Stop gate is required.
-    const auto keyboardArea = area.removeFromBottom(150);
+    // MIDI keyboard.
+    auto keyboardArea = area.removeFromBottom(142);
     area.removeFromBottom(gap);
 
-    // Effects are intentionally compact to leave more room for the filter plot.
-    auto effectsArea = area.removeFromBottom(170);
+    // Filter Envelope and future LFO.
+    auto modulationArea = area.removeFromBottom(255);
     area.removeFromBottom(gap);
 
-    // Dedicated, full-width frequency-response view and filter controls.
-    const auto filterArea = area.removeFromBottom(350);
-    area.removeFromBottom(gap);
+    // Effects column and main synth modules.
+    auto effectsArea = area.removeFromLeft(195);
+    area.removeFromLeft(gap);
 
-    // Waveform and envelope previews occupy the upper part of the fixed canvas.
-    auto synthArea = area;
-    oscillatorPanel.setBounds(synthArea.removeFromLeft(350));
-    synthArea.removeFromLeft(gap);
-    envelopePanel.setBounds(synthArea);
+    // Oscillator and amplitude envelope.
+    auto topArea = area.removeFromTop(265);
+    area.removeFromTop(gap);
 
-    filterPanel.setBounds(filterArea);
+    oscillatorPanel.setBounds(
+        topArea.removeFromLeft(405)
+    );
 
-    distortionPanel.setBounds(effectsArea.removeFromLeft(365));
-    effectsArea.removeFromLeft(gap);
+    topArea.removeFromLeft(gap);
+    envelopePanel.setBounds(topArea);
+
+    // Main FilterBank.
+    filterPanel.setBounds(area);
+
+    // Effects stacked vertically.
+    distortionPanel.setBounds(
+        effectsArea.removeFromTop(180)
+    );
+
+    effectsArea.removeFromTop(gap);
     chorusPanel.setBounds(effectsArea);
 
+    // Filter Envelope and LFO.
+    filterEnvelopePanel.setBounds(
+        modulationArea.removeFromLeft(710)
+    );
 
-    auto keyboardBounds = keyboardArea.reduced(4, 4);
+    modulationArea.removeFromLeft(gap);
+    lfoPanel.setBounds(modulationArea);
+
+    // MIDI keyboard.
+    auto keyboardBounds = keyboardArea.reduced(4);
 
     midiKeyboard.setBounds(keyboardBounds);
 
-    // Four octaves = 28 white keys.
     constexpr float numWhiteKeys = 28.0f;
 
-    const float keyWidth =
-        static_cast<float>(keyboardBounds.getWidth()) / numWhiteKeys;
-
-    midiKeyboard.setKeyWidth(keyWidth);
-
+    midiKeyboard.setKeyWidth(
+        static_cast<float>(keyboardBounds.getWidth())
+        / numWhiteKeys
+    );
 }

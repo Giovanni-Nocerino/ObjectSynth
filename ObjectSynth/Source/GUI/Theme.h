@@ -73,6 +73,44 @@ namespace osui
 
     using SliderAttachment = juce::AudioProcessorValueTreeState::SliderAttachment;
     using APVTS = juce::AudioProcessorValueTreeState;
+    using ButtonAttachment = APVTS::ButtonAttachment;
+    using ComboBoxAttachment = APVTS::ComboBoxAttachment;
+
+    // A small, clearly legible bypass switch for each module header.
+    class PowerButton final : public juce::TextButton
+    {
+    public:
+        PowerButton()
+        {
+            setClickingTogglesState(true);
+            setMouseClickGrabsKeyboardFocus(false);
+            setWantsKeyboardFocus(false);
+        }
+
+        void paintButton(juce::Graphics& g, bool isOver, bool isDown) override
+        {
+            const bool active = getToggleState();
+            const auto r = getLocalBounds().toFloat().reduced(0.5f);
+            const auto accent = active ? cyan() : muted();
+            g.setColour(active ? cyan().withAlpha(isDown ? 0.42f : 0.22f)
+                               : panelEdge().withAlpha(isOver ? 0.92f : 0.65f));
+            g.fillRoundedRectangle(r, 6.0f);
+            g.setColour(accent.withAlpha(0.75f));
+            g.drawRoundedRectangle(r, 6.0f, 1.0f);
+            g.setColour(active ? osui::text() : osui::muted());
+            g.setFont(juce::Font(juce::FontOptions(10.5f)));
+            g.drawFittedText(active ? "ON" : "OFF", getLocalBounds(),
+                             juce::Justification::centred, 1);
+        }
+    };
+
+    inline void setupPowerButton(juce::Component& owner, PowerButton& button,
+                                 std::unique_ptr<ButtonAttachment>& attachment,
+                                 APVTS& state, const juce::String& parameterID)
+    {
+        owner.addAndMakeVisible(button);
+        attachment = std::make_unique<ButtonAttachment>(state, parameterID, button);
+    }
 
     // The attachment is declared last so it is destroyed before its slider.
     struct Knob
