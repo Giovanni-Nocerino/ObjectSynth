@@ -3,6 +3,7 @@
 #include <juce_audio_processors/juce_audio_processors.h>
 #include <juce_dsp/juce_dsp.h>
 #include <array>
+#include <utility>
 #include <atomic>
 #include <limits>
 #include <mutex>
@@ -14,7 +15,10 @@
 #include "Synth/WavetableOscillator.h"
 #include "Synth/WavetableBank.h"
 #include "Synth/WavetableLoader.h"
+#include "Synth/WavetableSnapshotStore.h"
 #include "DSP/FilterBank.h"
+#include "DSP/Saturator.h"
+#include "DSP/StereoChorus.h"
 #include "DSP/LFO.h"
 #include "DSP/TempoSync.h"
 #include "DSP/ControlRateScheduler.h"
@@ -87,6 +91,9 @@ public:
     }
     juce::String getCustomWavetableName() const;
 
+    // Diagnostics/tests: custom wavetable snapshots currently kept in memory.
+    std::size_t getRetainedWavetableCount() const;
+
     // Portable user preset files. Never call these from the audio thread.
     bool savePresetFile(const juce::File& file, juce::String& message);
     bool loadPresetFile(const juce::File& file, juce::String& message);
@@ -126,6 +133,7 @@ public:
             {"chorusDepth", ModDestination::ChorusDepth},
             {"chorusDelay", ModDestination::ChorusDelay},
             {"chorusMix", ModDestination::ChorusMix},
+            {"outputPan", ModDestination::OutputPan},
         };
         for (const auto& [id, destination] : table)
             if (parameterID == id)
@@ -136,6 +144,14 @@ public:
     float getLfoPhaseForUI() const noexcept
     {
         return lfoPhaseForUI.load(std::memory_order_relaxed);
+    }
+
+    // Output meter (GUI thread): peak |sample| of a channel (0 = L, 1 = R)
+    // since the previous call, after the Volume stage. Lock-free.
+    float consumeOutputPeak(int channel) noexcept
+    {
+        return outputPeak[static_cast<std::size_t>(juce::jlimit(0, 1, channel))]
+            .exchange(0.0f, std::memory_order_acq_rel);
     }
 
 private:
@@ -155,16 +171,18 @@ private:
     using CustomTable = WavetableBank::Table;
     struct CustomWavetableSet
     {
+        std::uint64_t id = 0; // assigned by SnapshotStore::publish()
         std::vector<CustomTable> frames;
         std::vector<bool> seamWarnings;
     };
 
-    // Snapshots are immutable once published. Old snapshots stay alive so
-    // previously triggered voices can finish without accessing freed data.
+    // Snapshots are immutable once published. An old snapshot is freed (on
+    // the message thread) only after the audio thread reports that no
+    // sounding voice can still read it; see WavetableSnapshotStore.h.
     std::atomic<const CustomWavetableSet*> currentCustomSet {nullptr};
-    std::atomic<const CustomTable*> currentCustomTable {nullptr};
+    std::atomic<const CustomTable*> currentCustomTable {nullptr}; // GUI preview
     std::atomic<int> currentCustomFrame {0};
-    std::vector<std::unique_ptr<const CustomWavetableSet>> customTableVersions;
+    SnapshotStore<CustomWavetableSet> customTableStore;
     mutable std::mutex customTableMutex;
     juce::String customWavetableName;
     std::atomic<bool> customSeamWarning {false};
@@ -172,16 +190,37 @@ private:
                              std::vector<bool> seamWarnings,
                              const juce::String& name,
                              int selectedFrame = 0);
+    // Decodes the preset's Base64 wavetable blob (format v1 or v2).
+    static bool parseEmbeddedWavetable(const juce::String& encoded,
+                                       bool legacySeamWarning,
+                                       std::vector<CustomTable>& frames,
+                                       std::vector<bool>& warnings);
 
     juce::Synthesiser synthesiser;
+    // MIDI events of the current 32-sample chunk only. juce::Synthesiser
+    // handles every event at/after the chunk start, so it must never see
+    // the whole host buffer while rendering a chunk. Preallocated.
+    juce::MidiBuffer chunkMidi;
     std::atomic<Waveform> requestedWaveform { Waveform::Sawtooth };
     Waveform appliedWaveform = Waveform::Sawtooth;
     juce::MidiKeyboardState keyboardState;
 
-    juce::dsp::WaveShaper<float> distortion;
-    juce::dsp::Gain<float> distortionDrive;
-    juce::dsp::DryWetMixer<float> distortionMixer;
-    juce::dsp::Chorus<float> chorus;
+    Saturator distortionStage;      // oversampled, loudness-compensated
+    juce::dsp::Gain<float> outputGain; // Volume parameter, ramped
+    std::array<std::atomic<float>, 2> outputPeak {}; // max |sample| since last GUI read
+    StereoChorus chorus;            // right LFO 90 degrees ahead: real stereo
+    float panGainLeft = 1.0f, panGainRight = 1.0f; // last applied balance gains
+    float modulatedPan = 0.0f; // updated at control rate, used by every chunk
+
+    // Balance law: the side away from the pan direction is attenuated with
+    // a quarter cosine; the other side stays at unity (never boosted).
+    static std::pair<float, float> balanceGains(float pan) noexcept
+    {
+        const float p = juce::jlimit(-1.0f, 1.0f, pan);
+        const float halfPi = juce::MathConstants<float>::halfPi;
+        return {p > 0.0f ? std::cos(p * halfPi) : 1.0f,
+                p < 0.0f ? std::cos(-p * halfPi) : 1.0f};
+    }
 
     juce::AudioProcessorValueTreeState apvts;
 
@@ -217,6 +256,8 @@ private:
 
     std::atomic<float>* unisonCountParameter = nullptr;
     std::atomic<float>* unisonDetuneParameter = nullptr;
+    std::atomic<float>* unisonSpreadParameter = nullptr;
+    std::atomic<float>* outputPanParameter = nullptr;
 
     std::atomic<float>* oscillatorEnabledParameter = nullptr;
     std::atomic<float>* amplitudeEnvelopeEnabledParameter = nullptr;
@@ -231,6 +272,7 @@ private:
     std::atomic<float>* filterEnvEnabledParameter = nullptr;
     std::atomic<float>* distortionEnabledParameter = nullptr;
     std::atomic<float>* chorusEnabledParameter = nullptr;
+    std::atomic<float>* outputVolumeParameter = nullptr;
 
     LFO globalLFO;
     ControlRateScheduler lfoScheduler;

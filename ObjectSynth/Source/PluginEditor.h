@@ -10,8 +10,9 @@
 #include "GUI/EffectsPanel.h"
 #include "GUI/FilterEnvelopePanel.h"
 #include "GUI/LFOPanel.h"
+#include "GUI/OutputPanel.h"
 
-// V5: layout from the hand-drawn sketch (see resized() for the grid).
+// V6: sketch layout + effects column (DIST / CHORUS / OUTPUT) on the right.
 class ObjectSynthAudioProcessorEditor final : public juce::AudioProcessorEditor,
                                               private juce::Timer
 {
@@ -47,9 +48,12 @@ private:
     osui::ChorusPanel chorusPanel;
     osui::FilterEnvelopePanel filterEnvelopePanel;
     osui::LFOPanel lfoPanel;
+    osui::OutputPanel outputPanel;
     juce::MidiKeyboardComponent midiKeyboard;
 
-    static constexpr int designWidth = 1360;
+    // 16:10 logical canvas: the sketch's grid keeps its original widths and
+    // the effects column is added on the right instead of squeezing it.
+    static constexpr int designWidth = 1632;
     static constexpr int designHeight = 1020;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(ObjectSynthAudioProcessorEditor)

@@ -27,6 +27,7 @@ enum class ModDestination : int
     ChorusDepth,
     ChorusDelay,
     ChorusMix,
+    OutputPan,   // appended: existing indices (and saved presets) unchanged
     Count
 };
 
@@ -37,7 +38,8 @@ inline constexpr std::array<const char*,
     "LP Mix", "HP Mix", "BP Mix",
     "Voice LP Cutoff", "Filter Env Amount",
     "Distortion Drive", "Distortion Mix",
-    "Chorus Rate", "Chorus Depth", "Chorus Delay", "Chorus Mix"
+    "Chorus Rate", "Chorus Depth", "Chorus Delay", "Chorus Mix",
+    "Pan"
 };
 
 struct ModulationRoute

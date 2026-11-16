@@ -72,3 +72,36 @@ target_sources(ObjectSynthWavetableTest PRIVATE
 target_link_libraries(ObjectSynthWavetableTest PRIVATE
     juce::juce_audio_formats
 )
+# Engine regression tests: compiles the real processor/voice sources into a
+# console app and renders audio offline. Run with: ctest --preset debug
+juce_add_console_app(ObjectSynthEngineTests
+    PRODUCT_NAME "ObjectSynthEngineTests"
+    NEEDS_CURL FALSE
+)
+
+target_sources(ObjectSynthEngineTests PRIVATE
+    Tests/EngineRegressionTests.cpp
+    Source/PluginProcessor.cpp
+    Source/PluginEditor.cpp
+    Source/Synth/WavetableOscillator.cpp
+    Source/Synth/SynthVoice.cpp
+    Source/Synth/WavetableLoader.cpp
+)
+
+target_compile_features(ObjectSynthEngineTests PRIVATE cxx_std_17)
+
+target_compile_definitions(ObjectSynthEngineTests PRIVATE
+    JucePlugin_Name="ObjectSynth"
+    JUCE_WEB_BROWSER=0
+    JUCE_USE_CURL=0
+)
+
+target_link_libraries(ObjectSynthEngineTests PRIVATE
+    juce::juce_audio_utils
+    juce::juce_audio_basics
+    juce::juce_dsp
+    juce::juce_audio_formats
+)
+
+enable_testing()
+add_test(NAME EngineRegressionTests COMMAND ObjectSynthEngineTests)

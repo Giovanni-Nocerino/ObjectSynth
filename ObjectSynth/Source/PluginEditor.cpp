@@ -13,6 +13,7 @@ ObjectSynthAudioProcessorEditor::ObjectSynthAudioProcessorEditor(
       chorusPanel(processor.getAPVTS()),
       filterEnvelopePanel(processor.getAPVTS()),
       lfoPanel(processor.getAPVTS(), processor),
+      outputPanel(processor),
       midiKeyboard(processor.getKeyboardState(),
                    juce::MidiKeyboardComponent::horizontalKeyboard)
 {
@@ -28,18 +29,34 @@ ObjectSynthAudioProcessorEditor::ObjectSynthAudioProcessorEditor(
     uiCanvas.addAndMakeVisible(chorusPanel);
     uiCanvas.addAndMakeVisible(filterEnvelopePanel);
     uiCanvas.addAndMakeVisible(lfoPanel);
+    uiCanvas.addAndMakeVisible(outputPanel);
     uiCanvas.addAndMakeVisible(midiKeyboard);
 
-    midiKeyboard.setAvailableRange(48, 95);
-    midiKeyboard.setLowestVisibleKey(48);
+    // Five octaves (C1..C6): on the wider canvas the keys keep about the
+    // same proportions as the old four-octave keyboard.
+    midiKeyboard.setAvailableRange(36, 96);
+    midiKeyboard.setLowestVisibleKey(36);
     midiKeyboard.setScrollButtonsVisible(false);
     midiKeyboard.setMouseClickGrabsKeyboardFocus(true);
 
+    constexpr double aspect = static_cast<double>(designWidth) / designHeight; // 16:10
     setResizable(true, true);
-    setResizeLimits(952, 714, 2040, 1530);
-    getConstrainer()->setFixedAspectRatio(4.0 / 3.0);
-    setSize(1224, 918);
+    setResizeLimits(1120, 700, 2448, 1530);
+    getConstrainer()->setFixedAspectRatio(aspect);
 
+    // Open as large as fits comfortably on the main screen, never above
+    // the 1:1 design size (1632 x 1020).
+    double scale = 0.9;
+    if (const auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay())
+    {
+        const auto area = display->userArea;
+        scale = juce::jmin(1.0, area.getWidth() * 0.92 / designWidth,
+                           area.getHeight() * 0.85 / designHeight);
+    }
+    const int width = juce::jlimit(1120, designWidth, juce::roundToInt(designWidth * scale));
+    setSize(width, juce::roundToInt(width / aspect));
+
+    // Live LFO modulation display on the knobs.
     collectModulatableKnobs(uiCanvas);
     startTimerHz(30);
 }
@@ -115,34 +132,37 @@ void ObjectSynthAudioProcessorEditor::resized()
     uiCanvas.setTransform(juce::AffineTransform::scale(scale)
                               .translated(offsetX, offsetY));
 
-    // Layout V5, following the hand-drawn sketch (logical 1360 x 1020 canvas):
+    // Layout V6 (logical 1632 x 1020 canvas, 16:10): the sketch's grid on the left,
+    // and every effect of the output chain in one column on the right, in
+    // signal order (distortion -> chorus -> volume/pan).
     //
-    //   +--------------+-------------------+-------------+
-    //   | OSCILLATOR   | ENVELOPE          | FILTER BANK |   top row    ~48%
-    //   |              +-------------------+             |
-    //   |              | UNISON            |             |
-    //   +----------+---+-----------+-------+-------------+
-    //   | DIST.    | FILTER ENV    | LFO / MOD MATRIX    |   bottom row ~30%
-    //   | CHORUS   |               |                     |
-    //   +----------+---------------+---------------------+
-    //   | MIDI KEYBOARD                                  |   ~16%
-    //   +------------------------------------------------+
+    //   +-----------+-------------+-----------+  +-----------+
+    //   | OSCILLATOR| ENVELOPE    | FILTER    |  | DIST.     |
+    //   |           +-------------+ BANK      |  +-----------+
+    //   |           | UNISON      |           |  | CHORUS    |
+    //   +-----------+--+----------+-----------+  +-----------+
+    //   | FILTER ENVELOPE | LFO / MOD MATRIX  |  | OUTPUT    |
+    //   +-----------------+-------------------+  +-----------+
+    //   | MIDI KEYBOARD                                      |
+    //   +----------------------------------------------------+
     //
-    // The two rows use different column splits on purpose, as in the sketch:
-    // top 29 / 38.5 / 32.5 %, bottom 20 / 37 / 43 %.
+    // The effects column is split at the same height as the two rows, so
+    // all horizontal panel edges line up.
     constexpr int margin = 12;
     constexpr int gap = 8;
     constexpr int presetHeight = 36;
     constexpr int topRowHeight = 480;
     constexpr int keyboardHeight = 160;
 
+    // Left grid = the V5 sketch widths (384 / 508 / 420 on top), so nothing
+    // is squeezed by the effects column.
+    constexpr int effectsWidth = 272;
+    constexpr int distortionHeight = 200;
+
     constexpr int oscillatorWidth = 384;
     constexpr int centreWidth = 508;
     constexpr int envelopeHeight = 262;
-
-    constexpr int effectsWidth = 268;
-    constexpr int filterEnvelopeWidth = 488;
-    constexpr int distortionHeight = 104;
+    constexpr int filterEnvelopeWidth = 600;
 
     auto area = uiCanvas.getLocalBounds().reduced(margin);
 
@@ -151,6 +171,17 @@ void ObjectSynthAudioProcessorEditor::resized()
 
     auto keyboardArea = area.removeFromBottom(keyboardHeight);
     area.removeFromBottom(gap);
+
+    // --- Effects column (right): DIST + CHORUS beside the top row,
+    //     OUTPUT beside the bottom row.
+    auto effectsColumn = area.removeFromRight(effectsWidth);
+    area.removeFromRight(gap);
+    auto effectsTop = effectsColumn.removeFromTop(topRowHeight);
+    effectsColumn.removeFromTop(gap);
+    distortionPanel.setBounds(effectsTop.removeFromTop(distortionHeight));
+    effectsTop.removeFromTop(gap);
+    chorusPanel.setBounds(effectsTop);
+    outputPanel.setBounds(effectsColumn);
 
     auto topRow = area.removeFromTop(topRowHeight);
     area.removeFromTop(gap);
@@ -168,18 +199,12 @@ void ObjectSynthAudioProcessorEditor::resized()
 
     filterPanel.setBounds(topRow);
 
-    // --- Bottom row: DIST + CHORUS | FILTER ENVELOPE | LFO
-    auto effectsColumn = bottomRow.removeFromLeft(effectsWidth);
-    bottomRow.removeFromLeft(gap);
-    distortionPanel.setBounds(effectsColumn.removeFromTop(distortionHeight));
-    effectsColumn.removeFromTop(gap);
-    chorusPanel.setBounds(effectsColumn);
-
+    // --- Bottom row: FILTER ENVELOPE | LFO
     filterEnvelopePanel.setBounds(bottomRow.removeFromLeft(filterEnvelopeWidth));
     bottomRow.removeFromLeft(gap);
     lfoPanel.setBounds(bottomRow);
 
-    // --- Keyboard: full width, four octaves (28 white keys).
+    // --- Keyboard: full width, five octaves + top C (36 white keys).
     midiKeyboard.setBounds(keyboardArea);
-    midiKeyboard.setKeyWidth(static_cast<float>(keyboardArea.getWidth()) / 28.0f);
+    midiKeyboard.setKeyWidth(static_cast<float>(keyboardArea.getWidth()) / 36.0f);
 }

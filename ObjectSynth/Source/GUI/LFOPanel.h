@@ -85,7 +85,9 @@ namespace osui
             auto body = getBodyBounds();
 
             // Sketch, left column: display, waveform menu, rate slider.
-            auto left = body.removeFromLeft(200);
+            // Grows with the panel so a wide LFO does not just stretch the menus.
+            auto left = body.removeFromLeft(juce::jlimit(200, 280,
+                                                         juce::roundToInt(body.getWidth() * 0.36f)));
             body.removeFromLeft(18);
             routesArea = body;
 
@@ -101,6 +103,7 @@ namespace osui
             auto routesBody = routesArea;
             auto header = routesBody.removeFromTop(routeHeaderHeight);
             header.removeFromLeft(routeIndexWidth);
+            routeDepthWidth = juce::jlimit(150, 200, juce::roundToInt(routesArea.getWidth() * 0.4f));
             depthHeader = header.removeFromRight(routeDepthWidth);
             header.removeFromRight(10);
             destinationHeader = header;
@@ -223,6 +226,6 @@ namespace osui
 
         static constexpr int routeHeaderHeight = 18;
         static constexpr int routeIndexWidth = 20;
-        static constexpr int routeDepthWidth = 150;
+        int routeDepthWidth = 150; // set in resized()
     };
 }

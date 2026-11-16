@@ -21,7 +21,7 @@ ObjectSynthAudioProcessor::createParameterLayout(){
     ));
     
     layout.add (std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"sustain", 1}, "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 1.0f
+        juce::ParameterID{"sustain", 1}, "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.7f
     ));
     
     layout.add (std::make_unique<juce::AudioParameterFloat>(
@@ -119,6 +119,11 @@ ObjectSynthAudioProcessor::createParameterLayout(){
         juce::ParameterID{"unisonDetune", 1}, "Unison Detune", 0.0f, 25.0f, 0.0f
     ));
 
+    // 0 = all unison oscillators centred (mono), 1 = outermost hard L/R.
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID{"unisonSpread", 1}, "Unison Spread",
+        juce::NormalisableRange<float>{0.0f, 1.0f, 0.01f}, 0.5f));
+
     // Module bypass is deliberately independent from Dry/Wet and Mix.
     // Neutral init: only the oscillator and amplitude envelope start enabled.
     for (const auto* id : {"oscillatorEnabled", "amplitudeEnvelopeEnabled"})
@@ -146,6 +151,17 @@ ObjectSynthAudioProcessor::createParameterLayout(){
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID {"lfoWaveform", 1}, "LFO Waveform",
         juce::StringArray {"Sine", "Saw", "Square", "Triangle"}, 0));
+
+    // Replaces the old fixed 0.5 master attenuation.
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID {"outputVolume", 1}, "Output Volume",
+        juce::NormalisableRange<float> {-48.0f, 6.0f, 0.1f, 2.0f}, -6.0f,
+        juce::AudioParameterFloatAttributes().withLabel("dB")));
+
+    // Output balance: -1 = left only, 0 = centre, +1 = right only.
+    layout.add(std::make_unique<juce::AudioParameterFloat>(
+        juce::ParameterID {"outputPan", 1}, "Output Pan",
+        juce::NormalisableRange<float> {-1.0f, 1.0f, 0.01f}, 0.0f));
 
     juce::StringArray destinations;
     for (const char* name : modDestinationNames)
@@ -217,6 +233,9 @@ AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::s
     unisonDetuneParameter = apvts.getRawParameterValue("unisonDetune");
     jassert(unisonCountParameter != nullptr);
     jassert(unisonDetuneParameter != nullptr);
+    unisonSpreadParameter = apvts.getRawParameterValue("unisonSpread");
+    outputPanParameter = apvts.getRawParameterValue("outputPan");
+    jassert(unisonSpreadParameter != nullptr && outputPanParameter != nullptr);
     
     lpCutoffParameter = apvts.getRawParameterValue("lpCutoff");
     lpResonanceParameter = apvts.getRawParameterValue("lpResonance");
@@ -264,9 +283,8 @@ AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::s
         jassert(routeDestinationParameters[i] && routeDepthParameters[i]);
     }
 
-    distortion.functionToUse = [](float x){
-        return std::tanh(x);
-    };
+    outputVolumeParameter = apvts.getRawParameterValue("outputVolume");
+    jassert(outputVolumeParameter != nullptr);
 
     for (auto& value : modulatedForUI)
         value.store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
@@ -310,6 +328,8 @@ ObjectSynthAudioProcessor::getMapping(ModDestination destination, float maxCutof
         case ModDestination::ChorusDepth: return {value(chorusDepthParameter), 0.0f, 1.0f, 0.5f, false};
         case ModDestination::ChorusDelay: return {value(chorusDelayParameter), 1.0f, 30.0f, 14.5f, false};
         case ModDestination::ChorusMix: return {value(chorusMixParameter), 0.0f, 1.0f, 0.5f, false};
+        // Depth 1 with the LFO = full auto-pan sweep.
+        case ModDestination::OutputPan: return {value(outputPanParameter), -1.0f, 1.0f, 1.0f, false};
 
         case ModDestination::None:
         case ModDestination::Count: return {};
@@ -332,13 +352,13 @@ void ObjectSynthAudioProcessor::publishCustomFrames(
     if (snapshot->seamWarnings.size() != snapshot->frames.size())
         snapshot->seamWarnings.assign(snapshot->frames.size(), false);
 
-    const auto* publishedSet = snapshot.get();
     const int index = juce::jlimit(
-        0, static_cast<int>(publishedSet->frames.size()) - 1, selectedFrame);
+        0, static_cast<int>(snapshot->frames.size()) - 1, selectedFrame);
 
-    // This mutex is never used by the audio thread.
+    // This mutex is never used by the audio thread. publish() also frees
+    // the snapshots that the audio thread reported as no longer in use.
     std::lock_guard<std::mutex> lock(customTableMutex);
-    customTableVersions.push_back(std::move(snapshot));
+    const auto* publishedSet = customTableStore.publish(std::move(snapshot));
     customWavetableName = name;
     currentCustomSet.store(publishedSet, std::memory_order_release);
     currentCustomFrame.store(index, std::memory_order_release);
@@ -390,6 +410,12 @@ juce::String ObjectSynthAudioProcessor::getCustomWavetableName() const
 {
     std::lock_guard<std::mutex> lock(customTableMutex);
     return customWavetableName;
+}
+
+std::size_t ObjectSynthAudioProcessor::getRetainedWavetableCount() const
+{
+    std::lock_guard<std::mutex> lock(customTableMutex);
+    return customTableStore.size();
 }
 
 bool ObjectSynthAudioProcessor::savePresetFile(
@@ -485,24 +511,38 @@ void ObjectSynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
     prepareBypass(chorusBypassSmoother,
         chorusEnabledParameter->load(std::memory_order_relaxed) > 0.5f ? 1.0f : 0.0f);
 
-    distortionDrive.prepare(spec);
-    distortionDrive.setRampDurationSeconds(0.02);
-    distortionDrive.setGainLinear(distortioDriveParameter->load(std::memory_order_relaxed));
-    distortion.prepare(spec);
-    distortion.reset();
-    distortionMixer.prepare(spec);
-    distortionMixer.setMixingRule(juce::dsp::DryWetMixingRule::linear);
-    distortionMixer.setWetMixProportion(distortioMixParameter->load(std::memory_order_relaxed));
+    // Start at the real mix (Mix x enabled), so a bypassed distortion does
+    // not fade out audibly right after loading.
+    distortionStage.prepare(spec,
+        distortioDriveParameter->load(std::memory_order_relaxed),
+        distortionEnabledParameter->load(std::memory_order_relaxed) > 0.5f
+            ? distortioMixParameter->load(std::memory_order_relaxed) : 0.0f);
+    // Oversampling delays the whole signal by a few samples: tell the host.
+    setLatencySamples(distortionStage.getLatencySamples());
 
-    chorus.prepare(spec);
+    outputGain.prepare(spec);
+    outputGain.setRampDurationSeconds(0.02);
+    outputGain.setGainDecibels(outputVolumeParameter->load(std::memory_order_relaxed));
+    outputGain.reset();
+    for (auto& peak : outputPeak)
+        peak.store(0.0f, std::memory_order_relaxed);
+
     chorus.setRate(chorusRateParameter->load(std::memory_order_relaxed));
     chorus.setDepth(chorusDepthParameter->load(std::memory_order_relaxed));
     chorus.setCentreDelay(chorusDelayParameter->load(std::memory_order_relaxed));
-    chorus.setFeedback(0.0f);
-    chorus.setMix(chorusMixParameter->load(std::memory_order_relaxed));
-    chorus.reset();
+    chorus.setMix(chorusEnabledParameter->load(std::memory_order_relaxed) > 0.5f
+                      ? chorusMixParameter->load(std::memory_order_relaxed) : 0.0f);
+    chorus.prepare(spec); // starts at the values above, without ramps
 
-    // MIDI events keep their positions when audio is rendered in 32-sample chunks.
+    modulatedPan = outputPanParameter->load(std::memory_order_relaxed);
+    const auto pan = balanceGains(modulatedPan);
+    panGainLeft = pan.first;
+    panGainRight = pan.second;
+
+    // processBlock() renders in 32-sample chunks and hands the synthesiser
+    // only the events of each chunk (see chunkMidi), so events keep their
+    // exact sample positions and are handled exactly once.
+    chunkMidi.ensureSize(4096);
     synthesiser.setMinimumRenderingSubdivisionSize(1, false);
     synthesiser.setCurrentPlaybackSampleRate(sampleRate);
 }
@@ -557,19 +597,34 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
 
     const int unisonCount = juce::roundToInt(unisonCountParameter -> load(std::memory_order_relaxed));
     const float unisonDetune = unisonDetuneParameter -> load(std::memory_order_relaxed);
+    const float unisonSpread = unisonSpreadParameter -> load(std::memory_order_relaxed);
 
-    const auto* table = currentCustomTable.load(std::memory_order_acquire);
+    // Snapshot protocol (WavetableSnapshotStore.h): read nextId() first,
+    // then the set. The table is derived from the set we loaded, so its
+    // owner is known exactly and reported back at the end of the block.
+    std::uint64_t oldestCustomSetInUse = customTableStore.nextId();
+    const auto* customSet = currentCustomSet.load(std::memory_order_acquire);
+    const WavetableBank::Table* table = nullptr;
+    std::uint64_t customSetId = 0;
+    if (customSet != nullptr && ! customSet->frames.empty())
+    {
+        const int frame = juce::jlimit(0, static_cast<int>(customSet->frames.size()) - 1,
+                                       currentCustomFrame.load(std::memory_order_acquire));
+        table = &customSet->frames[static_cast<std::size_t>(frame)];
+        customSetId = customSet->id;
+        oldestCustomSetInUse = customSetId;
+    }
 
     for (int i = 0; i < synthesiser.getNumVoices(); ++i)
     {
         auto* voice = static_cast<SynthVoice*>(synthesiser.getVoice(i));
-        voice -> setCustomWaveform(table);
+        voice -> setCustomWaveform(table, customSetId);
         voice -> setOscillatorEnabled(oscillatorEnabled);
         voice -> setAmplitudeEnvelopeEnabled(amplitudeEnvelopeEnabled);
         voice -> setUnisonEnabled(unisonEnabled);
         voice -> setADSRParameters(amplitudeParameters);
         voice -> setVoiceFilterEnabled(voiceFilterEnabled);
-        voice -> setUnisonParameters(unisonCount, unisonDetune);
+        voice -> setUnisonParameters(unisonCount, unisonDetune, unisonSpread);
     }
 
     // Read all APVTS values once per host block, on the audio thread.
@@ -625,6 +680,9 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
         return static_cast<std::size_t>(destination);
     };
 
+    // Walks the (time-sorted) host MIDI once across all chunks.
+    auto nextMidiEvent = midiMessages.cbegin();
+
     int offset = 0;
     while (offset < numSamples)
     {
@@ -668,17 +726,18 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             filterBank.setOutputMix(filterBankBypassSmoother.processTarget(
                 filterBankEnabled ? 1.0f : 0.0f));
 
-            distortionDrive.setGainLinear(effective[index(ModDestination::DistortionDrive)]);
+            distortionStage.setDrive(effective[index(ModDestination::DistortionDrive)]);
             const float distortionWet = effective[index(ModDestination::DistortionMix)] *
                 distortionBypassSmoother.processTarget(distortionEnabled ? 1.0f : 0.0f);
-            distortionMixer.setWetMixProportion(juce::jlimit(0.0f, 1.0f, distortionWet));
+            distortionStage.setMix(distortionWet);
 
             chorus.setRate(effective[index(ModDestination::ChorusRate)]);
             chorus.setDepth(effective[index(ModDestination::ChorusDepth)]);
             chorus.setCentreDelay(effective[index(ModDestination::ChorusDelay)]);
             const float chorusWet = effective[index(ModDestination::ChorusMix)] *
                 chorusBypassSmoother.processTarget(chorusEnabled ? 1.0f : 0.0f);
-            chorus.setMix(juce::jlimit(0.0f, 1.0f, chorusWet));
+            chorus.setMix(chorusWet);
+            modulatedPan = effective[index(ModDestination::OutputPan)];
 
             // Global LFO; each MIDI note still has its own Filter ADSR state.
             for (int i = 0; i < synthesiser.getNumVoices(); ++i)
@@ -698,28 +757,85 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
             globalLFO.advance(chunk);
         }
 
+        // Only this chunk's events: Synthesiser::renderNextBlock() would
+        // otherwise fire later events early, once per chunk. The last chunk
+        // also takes any event a host placed past the end of the buffer.
+        chunkMidi.clear();
+        const bool lastChunk = offset + chunk >= numSamples;
+        for (; nextMidiEvent != midiMessages.cend(); ++nextMidiEvent)
+        {
+            const auto event = *nextMidiEvent;
+            if (event.samplePosition >= offset + chunk && ! lastChunk)
+                break;
+            // Channel messages only: the synthesiser ignores SysEx, and
+            // skipping it keeps the preallocated buffer allocation-free.
+            if (event.numBytes <= 3)
+                chunkMidi.addEvent(event.data, event.numBytes,
+                                   juce::jmin(event.samplePosition, offset + chunk - 1));
+        }
+
         // Processing synth + effects in the SAME chunks also enables
         // voice-filter and global-effect destinations, not just FilterBank.
-        synthesiser.renderNextBlock(buffer, midiMessages, offset, chunk);
+        synthesiser.renderNextBlock(buffer, chunkMidi, offset, chunk);
         filterBank.process(buffer, offset, chunk);
 
         juce::dsp::AudioBlock<float> fullBlock(buffer);
         auto subBlock = fullBlock.getSubBlock(static_cast<std::size_t>(offset),
                                                static_cast<std::size_t>(chunk));
-        juce::dsp::ProcessContextReplacing<float> context(subBlock);
 
-        distortionMixer.pushDrySamples(juce::dsp::AudioBlock<const float>(subBlock));
-        distortionDrive.process(context);
-        distortion.process(context);
-        distortionMixer.mixWetSamples(subBlock);
-        chorus.process(context);
+        distortionStage.process(subBlock);
+        chorus.process(subBlock);
+
+        // Output balance, ramped across the chunk so LFO auto-pan is smooth.
+        if (buffer.getNumChannels() > 1)
+        {
+            const auto pan = balanceGains(modulatedPan);
+            buffer.applyGainRamp(0, offset, chunk, panGainLeft, pan.first);
+            buffer.applyGainRamp(1, offset, chunk, panGainRight, pan.second);
+            panGainLeft = pan.first;
+            panGainRight = pan.second;
+        }
 
         lfoScheduler.advance(chunk);
         offset += chunk;
     }
 
-    // Preserve the original master output attenuation.
-    buffer.applyGain(0.5f);
+    // Tell the message thread which custom wavetable snapshots may still be
+    // read: the one loaded above and those latched by sounding voices.
+    for (int i = 0; i < synthesiser.getNumVoices(); ++i)
+    {
+        const auto inUse = static_cast<SynthVoice*>(synthesiser.getVoice(i))->getCustomSetIdInUse();
+        if (inUse != 0)
+            oldestCustomSetInUse = std::min(oldestCustomSetInUse, inUse);
+    }
+    customTableStore.reportOldestInUse(oldestCustomSetInUse);
+
+    // Output Volume (ramped), then the meter reads the final signal.
+    outputGain.setGainDecibels(outputVolumeParameter->load(std::memory_order_relaxed));
+    {
+        juce::dsp::AudioBlock<float> block(buffer);
+        outputGain.process(juce::dsp::ProcessContextReplacing<float>(block));
+    }
+
+    for (int channel = 0; channel < juce::jmin(2, buffer.getNumChannels()); ++channel)
+    {
+        const float blockPeak = buffer.getMagnitude(channel, 0, numSamples);
+        auto& peak = outputPeak[static_cast<std::size_t>(channel)];
+        float previous = peak.load(std::memory_order_relaxed);
+        while (blockPeak > previous
+               && ! peak.compare_exchange_weak(previous, blockPeak, std::memory_order_acq_rel))
+        {
+        }
+    }
+    if (buffer.getNumChannels() == 1) // mono layout: show the same level on both bars
+    {
+        const float mono = outputPeak[0].load(std::memory_order_relaxed);
+        float previous = outputPeak[1].load(std::memory_order_relaxed);
+        while (mono > previous
+               && ! outputPeak[1].compare_exchange_weak(previous, mono, std::memory_order_acq_rel))
+        {
+        }
+    }
 }
 
 void ObjectSynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
@@ -762,6 +878,67 @@ void ObjectSynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
         copyXmlToBinary(*xml, destData);
 }
 
+bool ObjectSynthAudioProcessor::parseEmbeddedWavetable(const juce::String& encoded,
+                                                       bool legacySeamWarning,
+                                                       std::vector<CustomTable>& frames,
+                                                       std::vector<bool>& warnings)
+{
+    frames.clear();
+    warnings.clear();
+
+    juce::MemoryBlock bytes;
+    if (! bytes.fromBase64Encoding(encoded) || bytes.getSize() < sizeof(juce::int32))
+        return false;
+
+    juce::MemoryInputStream stream(bytes, false);
+    const int version = stream.readInt();
+    int count = 0;
+    bool validSize = false;
+
+    if (version == 1)
+    {
+        // Compatibility with the previous single-cycle preset format.
+        count = 1;
+        validSize = bytes.getSize() ==
+            sizeof(juce::int32) + WavetableBank::tableSize * sizeof(float);
+    }
+    else if (version == 2 && bytes.getSize() >= 2 * sizeof(juce::int32))
+    {
+        count = stream.readInt();
+        if (count >= 1 && count <= 32)
+        {
+            const std::size_t perFrame = 1 +
+                WavetableBank::tableSize * sizeof(float);
+            validSize = bytes.getSize() ==
+                2 * sizeof(juce::int32) + static_cast<std::size_t>(count) * perFrame;
+        }
+    }
+
+    if (! validSize)
+        return false;
+
+    frames.reserve(static_cast<std::size_t>(count));
+    warnings.reserve(static_cast<std::size_t>(count));
+    bool valid = true;
+
+    for (int i = 0; i < count; ++i)
+    {
+        const bool warning = version == 2 ? stream.readByte() != 0 : legacySeamWarning;
+        CustomTable table{};
+        float peak = 0.0f;
+        for (float& sample : table)
+        {
+            sample = stream.readFloat();
+            valid = valid && std::isfinite(sample);
+            peak = std::max(peak, std::abs(sample));
+        }
+        valid = valid && peak > 1.0e-6f && peak <= 1.01f;
+        frames.push_back(std::move(table));
+        warnings.push_back(warning);
+    }
+    return valid;
+}
+
 void ObjectSynthAudioProcessor::setStateInformation(const void* data, int sizeInBytes)
 {
     auto xml = getXmlFromBinary(data, sizeInBytes);
@@ -771,8 +948,18 @@ void ObjectSynthAudioProcessor::setStateInformation(const void* data, int sizeIn
     if (!restored.isValid())
         return;
 
-    // Retain all old snapshots: active notes may still be reading them.
+    // Parse the embedded wavetable BEFORE touching the running synth, so new
+    // notes never see a half-restored state and bad data never costs us the
+    // current table.
+    const auto encoded = restored.getProperty("customWavetableData").toString();
+    const auto name = restored.getProperty("customWavetableName",
+                                           "Restored custom wavetable").toString();
+    const int frameIndex = static_cast<int>(restored.getProperty("customFrameIndex", 0));
+
+    if (encoded.isEmpty())
     {
+        // The preset has no custom wavetable: neither should the synth.
+        // Old snapshots stay alive until no voice reads them.
         std::lock_guard<std::mutex> lock(customTableMutex);
         currentCustomSet.store(nullptr, std::memory_order_release);
         currentCustomTable.store(nullptr, std::memory_order_release);
@@ -780,74 +967,33 @@ void ObjectSynthAudioProcessor::setStateInformation(const void* data, int sizeIn
         customSeamWarning.store(false, std::memory_order_release);
         customWavetableName.clear();
     }
-
-    const auto encoded = restored.getProperty("customWavetableData").toString();
-    if (encoded.isNotEmpty())
+    else
     {
-        juce::MemoryBlock bytes;
-        if (bytes.fromBase64Encoding(encoded) && bytes.getSize() >= sizeof(juce::int32))
+        std::vector<CustomTable> frames;
+        std::vector<bool> warnings;
+        const bool legacyWarning = static_cast<bool>(
+            restored.getProperty("customWavetableSeamWarning", false));
+
+        if (parseEmbeddedWavetable(encoded, legacyWarning, frames, warnings))
         {
-            juce::MemoryInputStream stream(bytes, false);
-            const int version = stream.readInt();
-            int count = 0;
-            bool validSize = false;
-
-            if (version == 1)
+            // Hosts restore state often (project load, undo, preset browsing):
+            // re-use the current snapshot when the data is identical.
+            bool identical = false;
             {
-                // Compatibility with the previous single-cycle preset format.
-                count = 1;
-                validSize = bytes.getSize() ==
-                    sizeof(juce::int32) + WavetableBank::tableSize * sizeof(float);
-            }
-            else if (version == 2 && bytes.getSize() >= 2 * sizeof(juce::int32))
-            {
-                count = stream.readInt();
-                if (count >= 1 && count <= 32)
-                {
-                    const std::size_t perFrame = 1 +
-                        WavetableBank::tableSize * sizeof(float);
-                    validSize = bytes.getSize() ==
-                        2 * sizeof(juce::int32) + static_cast<std::size_t>(count) * perFrame;
-                }
+                std::lock_guard<std::mutex> lock(customTableMutex);
+                const auto* current = currentCustomSet.load(std::memory_order_acquire);
+                identical = current != nullptr && current->frames == frames
+                            && current->seamWarnings == warnings;
+                if (identical)
+                    customWavetableName = name;
             }
 
-            if (validSize)
-            {
-                std::vector<CustomTable> frames;
-                std::vector<bool> warnings;
-                frames.reserve(static_cast<std::size_t>(count));
-                warnings.reserve(static_cast<std::size_t>(count));
-                bool valid = true;
-
-                for (int i = 0; i < count; ++i)
-                {
-                    const bool warning = version == 2
-                        ? stream.readByte() != 0
-                        : static_cast<bool>(restored.getProperty(
-                              "customWavetableSeamWarning", false));
-                    CustomTable table{};
-                    float peak = 0.0f;
-                    for (float& sample : table)
-                    {
-                        sample = stream.readFloat();
-                        valid = valid && std::isfinite(sample);
-                        peak = std::max(peak, std::abs(sample));
-                    }
-                    valid = valid && peak > 1.0e-6f && peak <= 1.01f;
-                    frames.push_back(std::move(table));
-                    warnings.push_back(warning);
-                }
-
-                if (valid)
-                {
-                    publishCustomFrames(
-                        std::move(frames), std::move(warnings),
-                        restored.getProperty("customWavetableName",
-                                             "Restored custom wavetable").toString(),
-                        static_cast<int>(restored.getProperty("customFrameIndex", 0)));
-                }
-            }
+            if (identical)
+                selectCustomFrame(juce::jlimit(0, static_cast<int>(frames.size()) - 1, frameIndex));
+            else
+                publishCustomFrames(std::move(frames), std::move(warnings), name, frameIndex);
         }
+        // Invalid data: keep the current wavetable instead of losing it.
     }
 
     const int waveform = juce::jlimit(
@@ -859,6 +1005,20 @@ void ObjectSynthAudioProcessor::setStateInformation(const void* data, int sizeIn
     for (const auto* property : {"customWavetableData", "customWavetableName",
                                  "customFrameIndex", "customWavetableSeamWarning"})
         restored.removeProperty(juce::Identifier(property), nullptr);
+
+    // A preset saved before a parameter existed (e.g. outputVolume,
+    // outputPan, unisonSpread) has no entry for it, and APVTS would then
+    // keep that parameter's CURRENT value. Restore it at its default instead.
+    for (auto* parameter : getParameters())
+    {
+        auto* ranged = dynamic_cast<juce::RangedAudioParameter*>(parameter);
+        if (ranged == nullptr || restored.getChildWithProperty("id", ranged->paramID).isValid())
+            continue;
+        juce::ValueTree entry("PARAM");
+        entry.setProperty("id", ranged->paramID, nullptr);
+        entry.setProperty("value", ranged->convertFrom0to1(ranged->getDefaultValue()), nullptr);
+        restored.appendChild(entry, nullptr);
+    }
 
     apvts.replaceState(restored);
     setWaveform(waveform == static_cast<int>(Waveform::Custom) &&
