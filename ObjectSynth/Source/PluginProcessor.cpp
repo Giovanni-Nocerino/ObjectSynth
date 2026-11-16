@@ -13,7 +13,7 @@ ObjectSynthAudioProcessor::createParameterLayout(){
     juce::AudioProcessorValueTreeState::ParameterLayout layout;
 
     layout.add (std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"attack", 1}, "Attack", juce::NormalisableRange<float>(0.0f, 5.0f, 0.001f), 0.1f
+        juce::ParameterID{"attack", 1}, "Attack", juce::NormalisableRange<float>(0.0f, 5.0f, 0.001f), 0.005f
     ));
     
     layout.add (std::make_unique<juce::AudioParameterFloat>(
@@ -21,15 +21,15 @@ ObjectSynthAudioProcessor::createParameterLayout(){
     ));
     
     layout.add (std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"sustain", 1}, "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 0.7f
+        juce::ParameterID{"sustain", 1}, "Sustain", juce::NormalisableRange<float>(0.0f, 1.0f, 0.001f), 1.0f
     ));
     
     layout.add (std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"release", 1}, "Release", juce::NormalisableRange<float>(0.0f, 5.0f, 0.001f), 0.2f
+        juce::ParameterID{"release", 1}, "Release", juce::NormalisableRange<float>(0.0f, 5.0f, 0.001f), 0.1f
     ));
 
     layout.add (std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"lpCutoff",1}, "LP Cutoff", juce::NormalisableRange<float>(20.0f, 18000.0f, 1.0f, 0.3f), 800.0f
+        juce::ParameterID{"lpCutoff",1}, "LP Cutoff", juce::NormalisableRange<float>(20.0f, 18000.0f, 1.0f, 0.3f), 18000.0f
     ));
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -108,29 +108,35 @@ ObjectSynthAudioProcessor::createParameterLayout(){
     ));
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"filterEnvAmount", 1}, "Filter Env Amount", juce::NormalisableRange<float>{-4.0f, 4.0f, 0.1f}, 3.0f
+        juce::ParameterID{"filterEnvAmount", 1}, "Filter Env Amount", juce::NormalisableRange<float>{-4.0f, 4.0f, 0.1f}, 0.0f
     ));
 
     layout.add(std::make_unique<juce::AudioParameterInt>(
-        juce::ParameterID{"unisonCount", 1}, "Unison Oscillators", 1, 7 , 7
+        juce::ParameterID{"unisonCount", 1}, "Unison Oscillators", 1, 7 , 1
     ));
 
     layout.add(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID{"unisonDetune", 1}, "Unison Detune", 0.0f, 25.0f, 20.0f
+        juce::ParameterID{"unisonDetune", 1}, "Unison Detune", 0.0f, 25.0f, 0.0f
     ));
 
     // Module bypass is deliberately independent from Dry/Wet and Mix.
-    for (const auto* id : {"oscillatorEnabled", "amplitudeEnvelopeEnabled",
-                           "unisonEnabled", "filterBankEnabled", "filterEnvEnabled",
-                           "distortionEnabled", "chorusEnabled", "lfoEnabled"})
+    // Neutral init: only the oscillator and amplitude envelope start enabled.
+    for (const auto* id : {"oscillatorEnabled", "amplitudeEnvelopeEnabled"})
     {
         layout.add(std::make_unique<juce::AudioParameterBool>(
             juce::ParameterID {id, 1}, juce::String(id), true));
     }
 
+    for (const auto* id : {"unisonEnabled", "filterBankEnabled", "filterEnvEnabled",
+                           "distortionEnabled", "chorusEnabled", "lfoEnabled"})
+    {
+        layout.add(std::make_unique<juce::AudioParameterBool>(
+            juce::ParameterID {id, 1}, juce::String(id), false));
+    }
+
     layout.add(std::make_unique<juce::AudioParameterFloat>(
         juce::ParameterID {"lfoRate", 1}, "LFO Rate",
-        juce::NormalisableRange<float> {0.05f, 20.0f, 0.01f, 0.35f}, 10.0f));
+        juce::NormalisableRange<float> {0.05f, 20.0f, 0.01f, 0.35f}, 2.0f));
 
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID {"lfoWaveform", 1}, "LFO Waveform",
