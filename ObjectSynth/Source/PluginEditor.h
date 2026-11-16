@@ -12,7 +12,8 @@
 #include "GUI/LFOPanel.h"
 
 // V5: layout from the hand-drawn sketch (see resized() for the grid).
-class ObjectSynthAudioProcessorEditor final : public juce::AudioProcessorEditor
+class ObjectSynthAudioProcessorEditor final : public juce::AudioProcessorEditor,
+                                              private juce::Timer
 {
 public:
     explicit ObjectSynthAudioProcessorEditor(ObjectSynthAudioProcessor& processor);
@@ -22,6 +23,19 @@ public:
     void resized() override;
 
 private:
+    // Pushes live modulated values onto the knobs (UI thread only).
+    void timerCallback() override;
+    void collectModulatableKnobs(juce::Component& parent);
+
+    struct ModulatedKnob
+    {
+        juce::Slider* slider = nullptr;
+        ModDestination destination = ModDestination::None;
+    };
+
+    ObjectSynthAudioProcessor& synthProcessor;
+    std::vector<ModulatedKnob> modulatedKnobs;
+
     osui::LookAndFeel theme;
     juce::Component uiCanvas;
     osui::PresetBar presetBar;

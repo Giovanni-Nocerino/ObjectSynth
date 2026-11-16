@@ -98,8 +98,9 @@ public:
 private:
     
     static constexpr double twoPi = 6.28318530717958647692;
-    static constexpr double minRateHz = 0.05;
-    static constexpr double maxRateHz = 20.0;
+    // Wide enough for tempo-synced rates (4 bars at slow tempos up to 1/32 at fast ones).
+    static constexpr double minRateHz = 0.01;
+    static constexpr double maxRateHz = 50.0;
 
     double sampleRate = 44100.0;
     double rateHz = 1.0;

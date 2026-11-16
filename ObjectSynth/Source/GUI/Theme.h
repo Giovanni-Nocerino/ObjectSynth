@@ -27,6 +27,23 @@ namespace osui
         return id;
     }
 
+    // APVTS parameter ID a knob is attached to (set by setupKnob()).
+    inline const juce::Identifier& parameterIdProperty()
+    {
+        static const juce::Identifier id { "osParameterId" };
+        return id;
+    }
+
+    // Live modulated position of a knob (0..1 proportion of its range), set by
+    // the editor's modulation timer. Absent when the parameter is not modulated.
+    inline const juce::Identifier& modulatedPositionProperty()
+    {
+        static const juce::Identifier id { "osModulatedPosition" };
+        return id;
+    }
+
+    inline juce::Colour modulation() { return juce::Colour::fromRGB(255, 214, 102); }
+
     class LookAndFeel final : public juce::LookAndFeel_V4
     {
     public:
@@ -69,6 +86,29 @@ namespace osui
             g.setColour(accent);
             g.strokePath(value, juce::PathStrokeType(stroke, juce::PathStrokeType::curved,
                                                     juce::PathStrokeType::rounded));
+
+            // Live modulation: an outer arc from the set value to where the LFO
+            // currently pushes it, plus a dot at the modulated position.
+            const auto& modulated = slider.getProperties()[modulatedPositionProperty()];
+            if (! modulated.isVoid())
+            {
+                const float modPosition = juce::jlimit(0.0f, 1.0f, static_cast<float>(static_cast<double>(modulated)));
+                const float modAngle = startAngle + modPosition * (endAngle - startAngle);
+                const float outer = radius + stroke + 1.5f;
+
+                juce::Path modArc;
+                modArc.addCentredArc(cx, cy, outer, outer, 0.0f,
+                                     juce::jmin(angle, modAngle), juce::jmax(angle, modAngle) + 0.001f, true);
+                g.setColour(modulation().withAlpha(0.85f));
+                g.strokePath(modArc, juce::PathStrokeType(juce::jmax(1.5f, stroke * 0.6f),
+                                                         juce::PathStrokeType::curved,
+                                                         juce::PathStrokeType::rounded));
+
+                const float dot = juce::jmax(2.5f, stroke * 0.8f);
+                g.setColour(modulation());
+                g.fillEllipse(cx + std::sin(modAngle) * outer - dot,
+                              cy - std::cos(modAngle) * outer - dot, dot * 2.0f, dot * 2.0f);
+            }
 
             g.setColour(juce::Colour::fromRGB(34, 48, 66));
             g.fillEllipse(cx - radius * 0.72f, cy - radius * 0.72f,
@@ -186,6 +226,7 @@ namespace osui
         if (suffix.isNotEmpty())
             control.slider.setTextValueSuffix(suffix);
         owner.addAndMakeVisible(control.slider);
+        control.slider.getProperties().set(parameterIdProperty(), id);
         control.attachment = std::make_unique<SliderAttachment>(apvts, id, control.slider);
     }
 

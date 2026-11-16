@@ -3,6 +3,7 @@
 ObjectSynthAudioProcessorEditor::ObjectSynthAudioProcessorEditor(
     ObjectSynthAudioProcessor& processor)
     : juce::AudioProcessorEditor(&processor),
+      synthProcessor(processor),
       presetBar(processor),
       oscillatorPanel(processor),
       unisonPanel(processor.getAPVTS()),
@@ -38,11 +39,63 @@ ObjectSynthAudioProcessorEditor::ObjectSynthAudioProcessorEditor(
     setResizeLimits(952, 714, 2040, 1530);
     getConstrainer()->setFixedAspectRatio(4.0 / 3.0);
     setSize(1224, 918);
+
+    collectModulatableKnobs(uiCanvas);
+    startTimerHz(30);
 }
 
 ObjectSynthAudioProcessorEditor::~ObjectSynthAudioProcessorEditor()
 {
+    stopTimer();
     setLookAndFeel(nullptr);
+}
+
+void ObjectSynthAudioProcessorEditor::collectModulatableKnobs(juce::Component& parent)
+{
+    for (auto* child : parent.getChildren())
+    {
+        if (auto* slider = dynamic_cast<juce::Slider*>(child))
+        {
+            const auto id = slider->getProperties()[osui::parameterIdProperty()].toString();
+            const auto destination = ObjectSynthAudioProcessor::destinationForParameter(id);
+            if (destination != ModDestination::None)
+                modulatedKnobs.push_back({slider, destination});
+        }
+        collectModulatableKnobs(*child);
+    }
+}
+
+void ObjectSynthAudioProcessorEditor::timerCallback()
+{
+    for (const auto& knob : modulatedKnobs)
+    {
+        auto& properties = knob.slider->getProperties();
+        const auto& previous = properties[osui::modulatedPositionProperty()];
+        const float value = synthProcessor.getModulatedValueForUI(knob.destination);
+
+        bool show = false;
+        double position = 0.0;
+        if (std::isfinite(value))
+        {
+            position = knob.slider->valueToProportionOfLength(static_cast<double>(value));
+            const double setPosition = knob.slider->valueToProportionOfLength(knob.slider->getValue());
+            show = std::isfinite(position) && std::abs(position - setPosition) > 0.002;
+        }
+
+        if (show)
+        {
+            if (previous.isVoid() || std::abs(static_cast<double>(previous) - position) > 0.001)
+            {
+                properties.set(osui::modulatedPositionProperty(), position);
+                knob.slider->repaint();
+            }
+        }
+        else if (! previous.isVoid())
+        {
+            properties.remove(osui::modulatedPositionProperty());
+            knob.slider->repaint();
+        }
+    }
 }
 
 void ObjectSynthAudioProcessorEditor::paint(juce::Graphics& g)

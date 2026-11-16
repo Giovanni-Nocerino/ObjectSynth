@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Theme.h"
+#include "../PluginProcessor.h"
 #include <array>
 #include <complex>
 #include <cmath>
@@ -10,7 +11,7 @@ namespace osui
     class FilterBankPanel final : public ModulePanel, private juce::Timer
     {
     public:
-        explicit FilterBankPanel(APVTS& state, juce::AudioProcessor& owner)
+        explicit FilterBankPanel(APVTS& state, ObjectSynthAudioProcessor& owner)
             : ModulePanel("FILTER BANK"),
               processor(owner)
         {
@@ -208,12 +209,26 @@ namespace osui
                                            : juce::Justification::centred);
             }
 
+            // Draw the response the audio actually uses: knob values plus any
+            // live LFO modulation. Falls back to the knobs before audio runs.
+            constexpr ModDestination destinations[3][3] = {
+                {ModDestination::LPCutoff, ModDestination::LPResonance, ModDestination::LPMix},
+                {ModDestination::HPCutoff, ModDestination::HPResonance, ModDestination::HPMix},
+                {ModDestination::BPCutoff, ModDestination::BPResonance, ModDestination::BPMix}
+            };
+            const auto live = [this, &destinations](std::size_t branch, std::size_t control)
+            {
+                const float value = processor.getModulatedValueForUI(destinations[branch][control]);
+                return std::isfinite(value) ? static_cast<double>(value)
+                                            : controls[branch][control].slider.getValue();
+            };
+
             std::array<double, 3> cutoff {}, resonance {}, mix {};
             for (std::size_t i = 0; i < controls.size(); ++i)
             {
-                cutoff[i] = controls[i][0].slider.getValue();
-                resonance[i] = controls[i][1].slider.getValue();
-                mix[i] = controls[i][2].slider.getValue();
+                cutoff[i] = live(i, 0);
+                resonance[i] = live(i, 1);
+                mix[i] = live(i, 2);
             }
 
             const double sum = mix[0] + mix[1] + mix[2];
@@ -266,7 +281,7 @@ namespace osui
             }
         }
 
-        juce::AudioProcessor& processor;
+        ObjectSynthAudioProcessor& processor;
         PowerButton power;
         std::unique_ptr<ButtonAttachment> powerAttachment;
         std::array<std::array<Knob, 3>, 3> controls;

@@ -134,9 +134,14 @@ ObjectSynthAudioProcessor::createParameterLayout(){
             juce::ParameterID {id, 1}, juce::String(id), false));
     }
 
-    layout.add(std::make_unique<juce::AudioParameterFloat>(
-        juce::ParameterID {"lfoRate", 1}, "LFO Rate",
-        juce::NormalisableRange<float> {0.05f, 20.0f, 0.01f, 0.35f}, 2.0f));
+    // LFO rate is tempo-synced to the host (note divisions, see DSP/TempoSync.h).
+    juce::StringArray syncDivisions;
+    for (const auto& division : TempoSync::divisions)
+        syncDivisions.add(division.name);
+
+    layout.add(std::make_unique<juce::AudioParameterChoice>(
+        juce::ParameterID {"lfoSync", 1}, "LFO Rate", syncDivisions,
+        TempoSync::defaultIndex));
 
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID {"lfoWaveform", 1}, "LFO Waveform",
@@ -238,14 +243,14 @@ AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::s
     jassert(oscillatorEnabledParameter && amplitudeEnvelopeEnabledParameter && unisonEnabledParameter);
 
     lfoEnabledParameter = apvts.getRawParameterValue("lfoEnabled");
-    lfoRateParameter = apvts.getRawParameterValue("lfoRate");
+    lfoSyncParameter = apvts.getRawParameterValue("lfoSync");
     lfoWaveformParameter = apvts.getRawParameterValue("lfoWaveform");
     filterBankEnabledParameter = apvts.getRawParameterValue("filterBankEnabled");
     filterEnvEnabledParameter = apvts.getRawParameterValue("filterEnvEnabled");
     distortionEnabledParameter = apvts.getRawParameterValue("distortionEnabled");
     chorusEnabledParameter = apvts.getRawParameterValue("chorusEnabled");
 
-    jassert(lfoEnabledParameter && lfoRateParameter && lfoWaveformParameter);
+    jassert(lfoEnabledParameter && lfoSyncParameter && lfoWaveformParameter);
     jassert(filterBankEnabledParameter && filterEnvEnabledParameter);
     jassert(distortionEnabledParameter && chorusEnabledParameter);
 
@@ -262,6 +267,9 @@ AudioProcessor (BusesProperties().withOutput ("Output", juce::AudioChannelSet::s
     distortion.functionToUse = [](float x){
         return std::tanh(x);
     };
+
+    for (auto& value : modulatedForUI)
+        value.store(std::numeric_limits<float>::quiet_NaN(), std::memory_order_relaxed);
 
     for (int i = 0; i < 8; ++i){
         synthesiser.addVoice(new SynthVoice());
@@ -438,7 +446,9 @@ void ObjectSynthAudioProcessor::prepareToPlay(double sampleRate, int samplesPerB
     const bool lfoReady = globalLFO.prepare(sampleRate);
     jassert(lfoReady);
     juce::ignoreUnused(lfoReady);
-    globalLFO.setRateHz(lfoRateParameter->load(std::memory_order_relaxed));
+    globalLFO.setRateHz(TempoSync::rateHz(
+        static_cast<int>(lfoSyncParameter->load(std::memory_order_relaxed)),
+        TempoSync::fallbackBpm));
     globalLFO.setWaveform(static_cast<LFO::Waveform>(
         static_cast<int>(lfoWaveformParameter->load(std::memory_order_relaxed))));
     lfoScheduler.reset();
@@ -563,7 +573,27 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     // Read all APVTS values once per host block, on the audio thread.
-    globalLFO.setRateHz(lfoRateParameter->load(std::memory_order_relaxed));
+    // LFO rate follows the host tempo; while the transport plays, the LFO
+    // phase is also locked to the host's beat position so it stays on the grid.
+    {
+        const int syncIndex = static_cast<int>(lfoSyncParameter->load(std::memory_order_relaxed));
+        double bpm = TempoSync::fallbackBpm;
+
+        if (auto* playHead = getPlayHead())
+        {
+            if (const auto position = playHead->getPosition())
+            {
+                if (const auto hostBpm = position->getBpm())
+                    bpm = *hostBpm;
+
+                if (position->getIsPlaying())
+                    if (const auto ppq = position->getPpqPosition())
+                        globalLFO.reset(TempoSync::phaseAt(syncIndex, *ppq));
+            }
+        }
+
+        globalLFO.setRateHz(TempoSync::rateHz(syncIndex, bpm));
+    }
     globalLFO.setWaveform(static_cast<LFO::Waveform>(
         static_cast<int>(lfoWaveformParameter->load(std::memory_order_relaxed))));
 
@@ -623,6 +653,7 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
                 const float smoothInput = map.logarithmic ? std::log2(safe) : safe;
                 const float smoothed = destinationSmoothers[i].processTarget(smoothInput);
                 effective[i] = map.logarithmic ? std::exp2(smoothed) : smoothed;
+                modulatedForUI[i].store(effective[i], std::memory_order_relaxed);
             }
 
             filterBank.setParameters(0, effective[index(ModDestination::LPCutoff)],

@@ -4,7 +4,9 @@
 #include <juce_dsp/juce_dsp.h>
 #include <array>
 #include <atomic>
+#include <limits>
 #include <mutex>
+#include <utility>
 #include <memory>
 #include <vector>
 
@@ -14,6 +16,7 @@
 #include "Synth/WavetableLoader.h"
 #include "DSP/FilterBank.h"
 #include "DSP/LFO.h"
+#include "DSP/TempoSync.h"
 #include "DSP/ControlRateScheduler.h"
 #include "DSP/ModulationSmoother.h"
 #include "DSP/ModulationMatrix.h"
@@ -91,6 +94,45 @@ public:
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts; }
 
     // GUI reads a single atomic sample; it never touches the audio LFO state.
+    // Live (LFO-modulated, smoothed) value of a modulation destination, for
+    // drawing only. NaN until the audio thread has produced a value.
+    float getModulatedValueForUI(ModDestination destination) const noexcept
+    {
+        const auto index = static_cast<std::size_t>(destination);
+        if (index == 0 || index >= modulatedForUI.size())
+            return std::numeric_limits<float>::quiet_NaN();
+        return modulatedForUI[index].load(std::memory_order_relaxed);
+    }
+
+    // Maps an APVTS parameter ID to its modulation destination (None if the
+    // parameter cannot be modulated).
+    static ModDestination destinationForParameter(const juce::String& parameterID) noexcept
+    {
+        static const std::pair<const char*, ModDestination> table[] = {
+            {"lpCutoff", ModDestination::LPCutoff},
+            {"hpCutoff", ModDestination::HPCutoff},
+            {"bpCutoff", ModDestination::BPCutoff},
+            {"lpResonance", ModDestination::LPResonance},
+            {"hpResonance", ModDestination::HPResonance},
+            {"bpResonance", ModDestination::BPResonance},
+            {"lpMix", ModDestination::LPMix},
+            {"hpMix", ModDestination::HPMix},
+            {"bpMix", ModDestination::BPMix},
+            {"voiceFilterCutoff", ModDestination::VoiceFilterCutoff},
+            {"filterEnvAmount", ModDestination::FilterEnvelopeAmount},
+            {"distortionDrive", ModDestination::DistortionDrive},
+            {"distortionMix", ModDestination::DistortionMix},
+            {"chorusRate", ModDestination::ChorusRate},
+            {"chorusDepth", ModDestination::ChorusDepth},
+            {"chorusDelay", ModDestination::ChorusDelay},
+            {"chorusMix", ModDestination::ChorusMix},
+        };
+        for (const auto& [id, destination] : table)
+            if (parameterID == id)
+                return destination;
+        return ModDestination::None;
+    }
+
     float getLfoPhaseForUI() const noexcept
     {
         return lfoPhaseForUI.load(std::memory_order_relaxed);
@@ -180,7 +222,7 @@ private:
     std::atomic<float>* amplitudeEnvelopeEnabledParameter = nullptr;
     std::atomic<float>* unisonEnabledParameter = nullptr;
     std::atomic<float>* lfoEnabledParameter = nullptr;
-    std::atomic<float>* lfoRateParameter = nullptr;
+    std::atomic<float>* lfoSyncParameter = nullptr;
     std::atomic<float>* lfoWaveformParameter = nullptr;
     std::array<std::atomic<float>*, ModulationMatrix::maxRoutes> routeDestinationParameters {};
     std::array<std::atomic<float>*, ModulationMatrix::maxRoutes> routeDepthParameters {};
@@ -198,6 +240,7 @@ private:
     ModulationSmoother distortionBypassSmoother;
     ModulationSmoother chorusBypassSmoother;
     std::atomic<float> lfoPhaseForUI {0.0f};
+    std::array<std::atomic<float>, ModulationMatrix::destinationCount> modulatedForUI {};
 
     FilterBank filterBank;
 

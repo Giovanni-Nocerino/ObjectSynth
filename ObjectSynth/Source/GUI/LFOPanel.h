@@ -28,13 +28,15 @@ namespace osui
             waveformAttachment = std::make_unique<ComboBoxAttachment>(
                 state, "lfoWaveform", waveformChoice);
 
-            rateSlider.setSliderStyle(juce::Slider::LinearHorizontal);
-            rateSlider.setTextBoxStyle(juce::Slider::TextBoxRight, false, 72, 22);
-            rateSlider.setTextValueSuffix(" Hz");
-            rateSlider.setColour(juce::Slider::trackColourId, cyan());
-            rateSlider.setMouseClickGrabsKeyboardFocus(false);
-            addAndMakeVisible(rateSlider);
-            rateAttachment = std::make_unique<SliderAttachment>(state, "lfoRate", rateSlider);
+            // Tempo-synced rate: note divisions of the host tempo.
+            for (std::size_t i = 0; i < TempoSync::divisions.size(); ++i)
+                rateChoice.addItem(TempoSync::divisions[i].name, static_cast<int>(i + 1));
+            rateChoice.setColour(juce::ComboBox::backgroundColourId, plotFill());
+            rateChoice.setColour(juce::ComboBox::textColourId, text());
+            rateChoice.setColour(juce::ComboBox::outlineColourId, panelEdge());
+            rateChoice.setMouseClickGrabsKeyboardFocus(false);
+            addAndMakeVisible(rateChoice);
+            rateAttachment = std::make_unique<ComboBoxAttachment>(state, "lfoSync", rateChoice);
 
             rateLabel.setText("RATE", juce::dontSendNotification);
             rateLabel.setFont(juce::Font(juce::FontOptions(10.0f)));
@@ -89,7 +91,7 @@ namespace osui
 
             auto rateRow = left.removeFromBottom(26);
             rateLabel.setBounds(rateRow.removeFromLeft(38));
-            rateSlider.setBounds(rateRow);
+            rateChoice.setBounds(rateRow);
             left.removeFromBottom(8);
             waveformChoice.setBounds(left.removeFromBottom(28));
             left.removeFromBottom(8);
@@ -210,8 +212,8 @@ namespace osui
         std::unique_ptr<ButtonAttachment> powerAttachment;
         juce::ComboBox waveformChoice;
         std::unique_ptr<ComboBoxAttachment> waveformAttachment;
-        juce::Slider rateSlider;
-        std::unique_ptr<SliderAttachment> rateAttachment;
+        juce::ComboBox rateChoice;
+        std::unique_ptr<ComboBoxAttachment> rateAttachment;
         juce::Label rateLabel;
         std::array<RouteControls, 4> routeControls;
         juce::Rectangle<int> plotArea;
