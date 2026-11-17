@@ -6,7 +6,8 @@
 
 namespace osui
 {
-    // Per-note unison. Parameters are latched by SynthVoice at MIDI note-on.
+    // Per-note unison. Changes also reach sounding notes (SynthVoice fades
+    // oscillators in/out and glides pans, so there are no clicks).
     class UnisonPanel final : public ModulePanel, private juce::Timer
     {
     public:
@@ -27,9 +28,9 @@ namespace osui
                 makeKnobInline(knob, 86);
             setupPowerButton(*this, power, powerAttachment, state, "unisonEnabled");
             setPowerIndicator(power);
-            knobs[0].slider.setTooltip("Oscillators per note (1-7). Applies to new notes.");
-            knobs[1].slider.setTooltip("Detuning of the outer oscillators, in cents. Applies to new notes.");
-            knobs[2].slider.setTooltip("Stereo width: the most detuned oscillators move furthest left/right. Applies to new notes.");
+            knobs[0].slider.setTooltip("Oscillators per note (1-7). Also changes sounding notes.");
+            knobs[1].slider.setTooltip("Detuning of the outer oscillators, in cents. Also changes sounding notes.");
+            knobs[2].slider.setTooltip("Stereo width: the most detuned oscillators move furthest left/right. Also changes sounding notes.");
             startTimerHz(15);
         }
 

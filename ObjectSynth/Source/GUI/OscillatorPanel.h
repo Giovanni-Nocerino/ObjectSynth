@@ -55,7 +55,7 @@ namespace osui
             frameSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
             frameSlider.setRange(0.0, 1.0, 1.0);
             frameSlider.setMouseClickGrabsKeyboardFocus(false);
-            frameSlider.setTooltip("Select wavetable frame for NEW notes only");
+            frameSlider.setTooltip("Select the wavetable frame. Sounding notes crossfade to it.");
             frameSlider.onValueChange = [this]
             {
                 if (processor.selectCustomFrame(
@@ -65,7 +65,7 @@ namespace osui
             addAndMakeVisible(frameSlider);
 
             loadButton.setButtonText("LOAD WAV");
-            loadButton.setTooltip("Load single-cycle or 2048-sample multiframe WAV. Existing notes keep their old wavetable.");
+            loadButton.setTooltip("Load single-cycle or 2048-sample multiframe WAV. Sounding notes crossfade to it.");
             loadButton.onClick = [this] { chooseWav(); };
             addAndMakeVisible(loadButton);
 
@@ -227,7 +227,7 @@ namespace osui
             {
                 const bool warning = processor.getCustomSeamWarning();
                 statusLabel.setText(warning ? "SEAM WARNING - check loop boundary"
-                                             : "Custom WAV ready - new notes only",
+                                             : "Custom WAV ready",
                                     juce::dontSendNotification);
                 statusLabel.setColour(juce::Label::textColourId,
                                       warning ? orange() : cyan());

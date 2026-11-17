@@ -4,6 +4,7 @@
 //   cmake --build --preset debug --target ObjectSynthEngineTests
 //   ctest --preset debug
 #include "../Source/PluginProcessor.h"
+#include "../Source/Synth/LiveADSR.h"
 
 #include <cmath>
 #include <cstdio>
@@ -80,13 +81,26 @@ namespace
         std::vector<float> left, right;
     };
 
-    Stereo render(ObjectSynthAudioProcessor& p, int totalSamples, const std::vector<Note>& notes)
+    // Something done to the synth while it plays (like a user turning a knob):
+    // applied just before the host block that contains `sample`.
+    struct Action
+    {
+        int sample;
+        std::function<void(ObjectSynthAudioProcessor&)> apply;
+    };
+
+    Stereo render(ObjectSynthAudioProcessor& p, int totalSamples, const std::vector<Note>& notes,
+                  const std::vector<Action>& actions = {})
     {
         const int channels = p.getTotalNumOutputChannels();
         Stereo out;
         juce::AudioBuffer<float> buffer(channels, blockSize);
         for (int start = 0; start < totalSamples; start += blockSize)
         {
+            for (const auto& action : actions)
+                if (action.sample >= start && action.sample < start + blockSize)
+                    action.apply(p);
+
             juce::MidiBuffer midi;
             for (const auto& n : notes)
                 if (n.sample >= start && n.sample < start + blockSize)
@@ -241,7 +255,8 @@ namespace
               "Snapshot store: a snapshot published after the last report is kept");
     }
 
-    juce::File writeTestWavetable(int frames)
+    juce::File writeTestWavetable(int frames,
+                                  std::function<float(int frame, double phase)> shape = {})
     {
         const auto file = juce::File::getSpecialLocation(juce::File::tempDirectory)
                               .getChildFile("ObjectSynthEngineTests_wavetable.wav");
@@ -253,7 +268,8 @@ namespace
             for (int i = 0; i < frameSize; ++i)
             {
                 const double phase = juce::MathConstants<double>::twoPi * i / frameSize;
-                const float value = static_cast<float>(
+                const float value = shape ? shape(f, phase / juce::MathConstants<double>::twoPi)
+                                          : static_cast<float>(
                     0.6 * std::sin(phase) + 0.3 * std::sin((2 + f % 5) * phase));
                 audio.setSample(0, f * frameSize + i, value);
             }
@@ -305,9 +321,10 @@ namespace
         wav.deleteFile();
     }
 
-    // A note started on table A keeps A alive while it sounds, even if
-    // new tables are loaded meanwhile; A is freed once the note is over.
-    void testHeldNoteKeepsItsWavetable()
+    // Loading a new table while a note is held: the note crossfades to the
+    // new table, and the old snapshot is freed once the crossfade is over,
+    // even though the note is still sounding.
+    void testHeldNoteFollowsNewWavetable()
     {
         const auto wav = writeTestWavetable(4);
         if (! wav.existsAsFile())
@@ -328,24 +345,17 @@ namespace
 
         for (int i = 0; i < 5; ++i)
         {
-            synth->loadCustomWav(wav, message); // B1..B5
+            synth->loadCustomWav(wav, message); // B1..B5, each a new snapshot
+            synth->processBlock(buffer, noMidi); // 512 samples > 480-sample crossfade
             synth->processBlock(buffer, noMidi);
         }
-        const auto whileHeld = synth->getRetainedWavetableCount();
-        bool sounding = buffer.getMagnitude(0, 0, blockSize) > 0.0f;
-
-        juce::MidiBuffer noteOff;
-        noteOff.addEvent(juce::MidiMessage::noteOff(1, 60), 0);
-        synth->processBlock(buffer, noteOff);
-        for (int i = 0; i < 20; ++i) // 0.05 s release, ~0.2 s rendered
-            synth->processBlock(buffer, noMidi);
         synth->loadCustomWav(wav, message);
-        synth->processBlock(buffer, noMidi);
+        const auto whileHeld = synth->getRetainedWavetableCount();
+        const bool sounding = buffer.getMagnitude(0, 0, blockSize) > 0.0f;
 
-        check(whileHeld >= 2 && sounding && synth->getRetainedWavetableCount() <= 2,
-              "Memory: held note keeps its table (" + juce::String(static_cast<int>(whileHeld))
-                  + " kept while held), freed after release (kept: "
-                  + juce::String(static_cast<int>(synth->getRetainedWavetableCount())) + ")");
+        check(whileHeld <= 2 && sounding,
+              "Memory: a held note follows newly loaded tables and the old ones are freed "
+              "while it still sounds (kept: " + juce::String(static_cast<int>(whileHeld)) + ")");
         wav.deleteFile();
     }
 
@@ -480,6 +490,101 @@ namespace
               "Distortion: THD rises with drive: " + juce::String(distortion[0] * 100.0, 1) + "% / "
                   + juce::String(distortion[1] * 100.0, 1) + "% / "
                   + juce::String(distortion[2] * 100.0, 1) + "% at drive 1 / 3 / 10");
+    }
+
+    // ------------------------------------------------- band-limited tables
+
+    void testBandLimitedWavetableLevels()
+    {
+        // Harmonic 1 and harmonic 300 at equal amplitude.
+        BandLimitedWavetable::Table source {};
+        for (std::size_t i = 0; i < source.size(); ++i)
+        {
+            const double phase = juce::MathConstants<double>::twoPi * static_cast<double>(i) / source.size();
+            source[i] = static_cast<float>(0.5 * std::sin(phase) + 0.5 * std::sin(300.0 * phase));
+        }
+        BandLimitedWavetable table(source);
+
+        check(table.level(0) == source, "Band-limit: level 0 is the source table, unchanged");
+
+        // Level keeping up to harmonic 256 must drop harmonic 300, keep harmonic 1.
+        const auto& filtered = table.level(4);
+        double error = 0.0;
+        for (std::size_t i = 0; i < source.size(); ++i)
+        {
+            const double phase = juce::MathConstants<double>::twoPi * static_cast<double>(i) / source.size();
+            error = std::max(error, std::abs(filtered[i] - 0.5 * std::sin(phase)));
+        }
+        check(BandLimitedWavetable::harmonicLimits[4] == 256 && error < 1.0e-5,
+              "Band-limit: harmonics above the level limit are removed, the rest kept (error "
+                  + juce::String(error, 7) + ")");
+
+        bool safe = true;
+        for (int note = 0; note <= 127; ++note)
+            for (const double rate : {44100.0, 48000.0, 96000.0})
+            {
+                const double cycles = juce::MidiMessage::getMidiNoteInHertz(note) / rate;
+                const auto level = BandLimitedWavetable::levelFor(cycles);
+                safe = safe && (level + 1 == BandLimitedWavetable::levelCount
+                                || BandLimitedWavetable::harmonicLimits[level] * cycles
+                                       <= BandLimitedWavetable::maxPartial);
+            }
+        check(safe, "Band-limit: for every MIDI note at 44.1/48/96 kHz no kept harmonic exceeds 0.45 fs");
+    }
+
+    // The distortion heard above ~C5: harmonics past Nyquist folding back.
+    void testOscillatorAliasing()
+    {
+        const auto wav = writeTestWavetable(2, [](int, double phase)
+        {
+            return static_cast<float>(2.0 * phase - 1.0); // naive saw: maximal harmonics
+        });
+        const char* names[] = {"Saw", "Square", "Custom (saw WAV)"};
+        for (int w = 0; w < 3; ++w)
+        {
+            double worst = -1000.0;
+            for (const int note : {84, 96}) // keyboard C5 and C6
+            {
+                auto synth = makeSynth([](ObjectSynthAudioProcessor& p)
+                {
+                    cleanPatch(p);
+                    set(p, "amplitudeEnvelopeEnabled", 0.0f);
+                });
+                juce::String message;
+                if (w == 2)
+                    synth->loadCustomWav(wav, message);
+                synth->setWaveform(w == 0 ? Waveform::Sawtooth
+                                          : w == 1 ? Waveform::Square : Waveform::Custom);
+                const auto out = render(*synth, warmUp + 48000, {{warmUp, note}});
+                const double f0 = juce::MidiMessage::getMidiNoteInHertz(note);
+                worst = std::max(worst, worstNonHarmonicDb(
+                    spectrum(out.left, static_cast<std::size_t>(warmUp + 12000)), f0));
+            }
+            check(worst < -60.0, juce::String("Aliasing: ") + names[w]
+                                     + " at C5/C6, strongest inharmonic component "
+                                     + juce::String(worst, 1) + " dB (was -27 dB for Saw at C5)");
+        }
+        wav.deleteFile();
+    }
+
+    void testBandLimitingKeepsLoudness()
+    {
+        double level[2] {};
+        const int notes[] = {60, 84};
+        for (int k = 0; k < 2; ++k)
+        {
+            auto synth = makeSynth([](ObjectSynthAudioProcessor& p)
+            {
+                cleanPatch(p);
+                set(p, "amplitudeEnvelopeEnabled", 0.0f);
+                p.setWaveform(Waveform::Sawtooth);
+            });
+            const auto out = render(*synth, warmUp + 24000, {{warmUp, notes[k]}});
+            level[k] = rms(out.left, static_cast<std::size_t>(warmUp + 4800), out.left.size());
+        }
+        const double difference = decibels(level[1] / level[0]);
+        check(std::abs(difference) < 1.0,
+              "Band-limit: a saw at C5 is as loud as at C3 (" + juce::String(difference, 2) + " dB)");
     }
 
     void testDistortionAliasing()
@@ -624,6 +729,198 @@ namespace
                   + juce::String(level, 3) + ")");
     }
 
+    // ----------------------------------------------------- live changes
+
+    float maxStep(const std::vector<float>& x, std::size_t from, std::size_t to)
+    {
+        float result = 0.0f;
+        for (std::size_t i = std::max<std::size_t>(from, 1); i < std::min(to, x.size()); ++i)
+            result = std::max(result, std::abs(x[i] - x[i - 1]));
+        return result;
+    }
+
+    // A click is a one-sample jump much larger than the waveform's own
+    // steepest step. Each change below is made at several moments (different
+    // phases) and the worst transition is compared with the steady signal.
+    struct ClickCheck
+    {
+        float transition = 0.0f, steady = 0.0f;
+        bool ok(float factor = 2.0f) const { return transition <= factor * steady; }
+        juce::String describe() const
+        {
+            return "worst step " + juce::String(transition, 4) + " vs steady " + juce::String(steady, 4);
+        }
+    };
+
+    ClickCheck measureClicks(const Setup& setup, int note,
+                             const std::function<void(ObjectSynthAudioProcessor&)>& change)
+    {
+        ClickCheck result;
+        for (int k = 0; k < 4; ++k)
+        {
+            const int changeAt = warmUp + 12288 + k * 3 * blockSize; // block-aligned
+            auto synth = makeSynth(setup);
+            const auto out = render(*synth, changeAt + 24000, {{warmUp, note}}, {{changeAt, change}});
+            const auto at = static_cast<std::size_t>(changeAt + synth->getLatencySamples());
+            for (const auto* channel : {&out.left, &out.right})
+            {
+                result.transition = std::max(result.transition, maxStep(*channel, at - 4, at + 960));
+                result.steady = std::max({result.steady, maxStep(*channel, at - 4800, at - 8),
+                                          maxStep(*channel, at + 4800, at + 9600)});
+            }
+        }
+        return result;
+    }
+
+    void steadySine(ObjectSynthAudioProcessor& p)
+    {
+        cleanPatch(p);
+        set(p, "amplitudeEnvelopeEnabled", 0.0f); // constant level
+    }
+
+    void testLiveWaveformChange()
+    {
+        const auto clicks = measureClicks(steadySine, 57,
+            [](ObjectSynthAudioProcessor& p) { p.setWaveform(Waveform::Triangle); });
+        check(clicks.ok(), "Live: Sine -> Triangle on a held note is click-free (" + clicks.describe() + ")");
+
+        // And the held note really changes: a triangle has a 3rd harmonic.
+        const double f0 = juce::MidiMessage::getMidiNoteInHertz(57);
+        auto synth = makeSynth(steadySine);
+        const int changeAt = warmUp + 36 * blockSize; // 16384-sample window fits before it
+        const auto out = render(*synth, changeAt + 48000, {{warmUp, 57}},
+            {{changeAt, [](ObjectSynthAudioProcessor& p) { p.setWaveform(Waveform::Triangle); }}});
+        const auto before = spectrum(out.left, static_cast<std::size_t>(changeAt - 16384 - blockSize));
+        const auto after = spectrum(out.left, static_cast<std::size_t>(changeAt + 4800));
+        const double thirdBefore = decibels(before.around(3 * f0) / before.around(f0));
+        const double thirdAfter = decibels(after.around(3 * f0) / after.around(f0));
+        check(thirdBefore < -50.0 && thirdAfter > -25.0,
+              "Live: the held note becomes a triangle (3rd harmonic " + juce::String(thirdBefore, 0)
+                  + " dB -> " + juce::String(thirdAfter, 0) + " dB)");
+    }
+
+    void testLiveCustomFrameChange()
+    {
+        // Frame 1: sine, frame 2: saw.
+        const auto wav = writeTestWavetable(2, [](int frame, double phase)
+        {
+            return frame == 0 ? static_cast<float>(std::sin(juce::MathConstants<double>::twoPi * phase))
+                              : static_cast<float>(2.0 * phase - 1.0);
+        });
+        const double f0 = juce::MidiMessage::getMidiNoteInHertz(57);
+        auto synth = makeSynth(steadySine);
+        juce::String message;
+        synth->loadCustomWav(wav, message);
+        const int changeAt = warmUp + 36 * blockSize; // 16384-sample window fits before it
+        const auto out = render(*synth, changeAt + 48000, {{warmUp, 57}},
+            {{changeAt, [](ObjectSynthAudioProcessor& p) { p.selectCustomFrame(1); }}});
+        const auto before = spectrum(out.left, static_cast<std::size_t>(changeAt - 16384 - blockSize));
+        const auto after = spectrum(out.left, static_cast<std::size_t>(changeAt + 4800));
+        const double secondBefore = decibels(before.around(2 * f0) / before.around(f0));
+        const double secondAfter = decibels(after.around(2 * f0) / after.around(f0));
+        check(secondBefore < -50.0 && secondAfter > -10.0,
+              "Live: moving the frame slider changes the held note (2nd harmonic "
+                  + juce::String(secondBefore, 0) + " dB -> " + juce::String(secondAfter, 0) + " dB)");
+        wav.deleteFile();
+    }
+
+    void testLiveUnisonChange()
+    {
+        auto setup = [](ObjectSynthAudioProcessor& p)
+        {
+            steadySine(p);
+            set(p, "unisonEnabled", 1.0f);
+            set(p, "unisonCount", 1.0f);
+            set(p, "unisonDetune", 20.0f);
+            set(p, "unisonSpread", 1.0f);
+        };
+        auto widen = [](ObjectSynthAudioProcessor& p) { set(p, "unisonCount", 7.0f); };
+
+        const auto clicks = measureClicks(setup, 57, widen);
+        check(clicks.ok(), "Live: Unison 1 -> 7 voices on a held note is click-free (" + clicks.describe() + ")");
+
+        auto synth = makeSynth(setup);
+        const int changeAt = warmUp + 12288;
+        const auto out = render(*synth, changeAt + 48000, {{warmUp, 57}}, {{changeAt, widen}});
+        Stereo before, after;
+        before.left.assign(out.left.begin() + warmUp + 2048, out.left.begin() + changeAt);
+        before.right.assign(out.right.begin() + warmUp + 2048, out.right.begin() + changeAt);
+        after.left.assign(out.left.begin() + changeAt + 4800, out.left.end());
+        after.right.assign(out.right.begin() + changeAt + 4800, out.right.end());
+        const double cBefore = correlation(before, 0), cAfter = correlation(after, 0);
+        const double loudness = decibels(rms(after.left, 0, after.left.size())
+                                         / rms(before.left, 0, before.left.size()));
+        check(cBefore > 0.999 && cAfter < 0.9 && std::abs(loudness) < 2.0,
+              "Live: the held note gets 7 detuned, spread voices (L/R correlation "
+                  + juce::String(cBefore, 2) + " -> " + juce::String(cAfter, 2) + ", level "
+                  + juce::String(loudness, 1) + " dB)");
+    }
+
+    void testLiveEnvelopeChanges()
+    {
+        auto setup = [](ObjectSynthAudioProcessor& p)
+        {
+            cleanPatch(p);
+            set(p, "sustain", 0.7f);
+        };
+        auto lower = [](ObjectSynthAudioProcessor& p) { set(p, "sustain", 0.2f); };
+
+        const auto clicks = measureClicks(setup, 57, lower);
+        check(clicks.ok(), "Live: Sustain 0.7 -> 0.2 on a held note is click-free (" + clicks.describe() + ")");
+
+        auto synth = makeSynth(setup);
+        const int changeAt = warmUp + 12288;
+        const auto out = render(*synth, changeAt + 24000, {{warmUp, 57}}, {{changeAt, lower}});
+        const double ratio = rms(out.left, static_cast<std::size_t>(changeAt + 4800), static_cast<std::size_t>(changeAt + 14400))
+                             / rms(out.left, static_cast<std::size_t>(changeAt - 9600), static_cast<std::size_t>(changeAt));
+        check(std::abs(ratio - 0.2 / 0.7) < 0.02,
+              "Live: the held note follows the new Sustain (level x" + juce::String(ratio, 3) + ", expected x0.286)");
+
+        // juce::ADSR cut a releasing note dead when Sustain was set to 0
+        // (it recomputed the release slope from the sustain level).
+        auto releasing = makeSynth([](ObjectSynthAudioProcessor& p)
+        {
+            cleanPatch(p);
+            set(p, "release", 1.0f);
+        });
+        const int noteOff = warmUp + 9600;
+        const auto tail = render(*releasing, noteOff + 24000, {{warmUp, 57}, {noteOff, 57, false}},
+            {{noteOff + 4608, [](ObjectSynthAudioProcessor& p) { set(p, "sustain", 0.0f); }}});
+        const float stillThere = peak(tail.left, static_cast<std::size_t>(noteOff + 9600),
+                                      static_cast<std::size_t>(noteOff + 12000));
+        check(stillThere > 0.05f,
+              "Live: setting Sustain to 0 during the release does not cut the note (level "
+                  + juce::String(stillThere, 3) + " 0.2 s later)");
+    }
+
+    void testLiveADSRUnit()
+    {
+        LiveADSR adsr;
+        adsr.setSampleRate(48000.0);
+        adsr.setParameters(0.0f, 0.0f, 1.0f, 1.0f);
+        adsr.noteOn();
+        for (int i = 0; i < 100; ++i) adsr.getNextSample();
+        adsr.noteOff();
+        for (int i = 0; i < 24000; ++i) adsr.getNextSample(); // half of a 1 s release
+        const float halfway = adsr.getLevel();
+        adsr.setParameters(0.0f, 0.0f, 1.0f, 2.0f); // slower release from HERE
+        const float next = adsr.getNextSample();
+        int samples = 1;
+        // Calling setParameters every sample with unchanged values must not
+        // restart the release (it would then never finish).
+        while (adsr.isActive() && samples < 200000)
+        {
+            adsr.setParameters(0.0f, 0.0f, 1.0f, 2.0f);
+            adsr.getNextSample();
+            ++samples;
+        }
+        check(std::abs(halfway - 0.5f) < 0.01f && std::abs(next - halfway) < 1.0e-4f
+                  && std::abs(samples - 96000) < 960, // 1%: float accumulation over 96k steps
+              "LiveADSR: changing Release mid-release continues from the current level and "
+              "lasts the new time (" + juce::String(samples) + " samples = " + juce::String(samples / 48000.0, 3) + " s for the rest; level "
+                  + juce::String(halfway, 4) + " -> " + juce::String(next, 4) + ")");
+    }
+
     // The OUTPUT meter reads the peak after Volume, and each read resets it.
     void testOutputMeterPeak()
     {
@@ -680,17 +977,25 @@ int main()
     testVoiceStealIsClickFree();
     testSnapshotStoreRules();
     testWavetableMemoryIsReclaimed();
-    testHeldNoteKeepsItsWavetable();
+    testHeldNoteFollowsNewWavetable();
     testNoteLevel();
     testUnisonKeepsLoudness();
     testDriveChangesToneNotLoudness();
     testDistortionAliasing();
+    testBandLimitedWavetableLevels();
+    testOscillatorAliasing();
+    testBandLimitingKeepsLoudness();
     testDefaultPatchChordHasHeadroom();
     testUnisonSpread();
     testChorusIsStereo();
     testPanExtremes();
     testLfoAutoPan();
     testMonoOutputLayout();
+    testLiveADSRUnit();
+    testLiveWaveformChange();
+    testLiveCustomFrameChange();
+    testLiveUnisonChange();
+    testLiveEnvelopeChanges();
     testOutputMeterPeak();
     testOldPresetGetsDefaultsForNewParameters();
 

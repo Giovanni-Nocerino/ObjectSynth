@@ -352,6 +352,12 @@ void ObjectSynthAudioProcessor::publishCustomFrames(
     if (snapshot->seamWarnings.size() != snapshot->frames.size())
         snapshot->seamWarnings.assign(snapshot->frames.size(), false);
 
+    // Anti-aliased playback copies (FFT work), done here on the loading
+    // thread and before taking the lock; the audio thread only reads them.
+    snapshot->bandLimited.resize(snapshot->frames.size());
+    for (std::size_t i = 0; i < snapshot->frames.size(); ++i)
+        snapshot->bandLimited[i].build(snapshot->frames[i]);
+
     const int index = juce::jlimit(
         0, static_cast<int>(snapshot->frames.size()) - 1, selectedFrame);
 
@@ -604,13 +610,13 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     // owner is known exactly and reported back at the end of the block.
     std::uint64_t oldestCustomSetInUse = customTableStore.nextId();
     const auto* customSet = currentCustomSet.load(std::memory_order_acquire);
-    const WavetableBank::Table* table = nullptr;
+    const BandLimitedWavetable* table = nullptr;
     std::uint64_t customSetId = 0;
-    if (customSet != nullptr && ! customSet->frames.empty())
+    if (customSet != nullptr && ! customSet->bandLimited.empty())
     {
-        const int frame = juce::jlimit(0, static_cast<int>(customSet->frames.size()) - 1,
+        const int frame = juce::jlimit(0, static_cast<int>(customSet->bandLimited.size()) - 1,
                                        currentCustomFrame.load(std::memory_order_acquire));
-        table = &customSet->frames[static_cast<std::size_t>(frame)];
+        table = &customSet->bandLimited[static_cast<std::size_t>(frame)];
         customSetId = customSet->id;
         oldestCustomSetInUse = customSetId;
     }
@@ -801,7 +807,8 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
 
     // Tell the message thread which custom wavetable snapshots may still be
-    // read: the one loaded above and those latched by sounding voices.
+    // read: the one loaded above, and those sounding voices play or are
+    // still crossfading from.
     for (int i = 0; i < synthesiser.getNumVoices(); ++i)
     {
         const auto inUse = static_cast<SynthVoice*>(synthesiser.getVoice(i))->getCustomSetIdInUse();

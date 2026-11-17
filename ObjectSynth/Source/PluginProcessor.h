@@ -172,8 +172,9 @@ private:
     struct CustomWavetableSet
     {
         std::uint64_t id = 0; // assigned by SnapshotStore::publish()
-        std::vector<CustomTable> frames;
+        std::vector<CustomTable> frames;              // as loaded (GUI, presets)
         std::vector<bool> seamWarnings;
+        std::vector<BandLimitedWavetable> bandLimited; // per frame, for playback
     };
 
     // Snapshots are immutable once published. An old snapshot is freed (on

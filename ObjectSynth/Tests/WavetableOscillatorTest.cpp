@@ -42,17 +42,22 @@ int main()
 
 
 
+    // Linear interpolation on the full-band table. The oscillator reads a
+    // band-limited copy above ~21 Hz at 48 kHz (BandLimitedWavetable), so the
+    // test uses a frequency low enough to play level 0, the raw saw table.
     WavetableOscillator interpolationOsc;
 
-    interpolationOsc.prepare(8.0);
-    interpolationOsc.setFrequency(0.5);
+    interpolationOsc.prepare(48000.0);
+    interpolationOsc.setFrequency(1.5);
     interpolationOsc.setWaveform(Waveform::Sawtooth);
 
     const float sample0 = interpolationOsc.getNextSample();
     const float sample1 = interpolationOsc.getNextSample();
 
+    // Step = 1.5 * 2048 / 48000 = 0.064 table samples; saw slope = 2 / 2048.
+    const float expected1 = -1.0f + 0.064f * (2.0f / 2048.0f);
     assert(std::abs(sample0 - (-1.0f)) < 1e-6f);
-    assert(std::abs(sample1 - (-0.875f)) < 1e-6f);
+    assert(std::abs(sample1 - expected1) < 1e-6f);
 
     std::cout << "Interpolation test passed!\n";
 

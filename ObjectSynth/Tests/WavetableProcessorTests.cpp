@@ -44,8 +44,8 @@ int main()
     WavetableOscillator left, right;
     left.prepare(48000.0);
     right.prepare(48000.0);
-    left.setCustomTable(&WavetableBank::builtIn().getTable(Waveform::Sine));
-    right.setCustomTable(&WavetableBank::builtIn().getTable(Waveform::Sine));
+    left.setCustomTable(&WavetableBank::builtIn().getBandLimited(Waveform::Sine));
+    right.setCustomTable(&WavetableBank::builtIn().getBandLimited(Waveform::Sine));
     left.setWaveform(Waveform::Custom);
     right.setWaveform(Waveform::Custom);
     left.setFrequency(220.0);
