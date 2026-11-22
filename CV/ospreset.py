@@ -3,6 +3,8 @@
 Byte-compatible with ObjectSynthAudioProcessor::getStateInformation():
 JUCE copyXmlToBinary() header + the APVTS <PARAMETERS> XML, with the custom
 wavetable embedded as JUCE-style base64 (MemoryBlock::toBase64Encoding).
+The photographed object can be embedded too (objectPhoto: a small JPEG,
+objectName), shown by the synth's preset bar.
 
 Parameters that are not written are restored at their default value by the
 synth, so a preset only needs the parameters the macros actually set.
@@ -49,13 +51,17 @@ def encode_wavetable(frames: np.ndarray) -> str:
     return juce_base64(bytes(payload))
 
 
-def build_xml(parameters: dict, frames=None, wavetable_name="", frame_index=0) -> str:
+def build_xml(parameters: dict, frames=None, wavetable_name="", frame_index=0,
+              photo_jpeg=None, object_name="") -> str:
     attributes = {}
     if frames is not None:
         attributes["selectedWaveform"] = str(CUSTOM_WAVEFORM)
         attributes["customWavetableName"] = wavetable_name
         attributes["customFrameIndex"] = str(int(frame_index))
         attributes["customWavetableData"] = encode_wavetable(frames)
+    if photo_jpeg:
+        attributes["objectPhoto"] = juce_base64(photo_jpeg)
+        attributes["objectName"] = object_name
 
     root = "".join(f" {key}={quoteattr(value)}" for key, value in attributes.items())
     params = "".join(
@@ -65,9 +71,11 @@ def build_xml(parameters: dict, frames=None, wavetable_name="", frame_index=0) -
     return f'<?xml version="1.0" encoding="UTF-8"?> <PARAMETERS{root}>{params}</PARAMETERS>'
 
 
-def write_preset(path, parameters: dict, frames=None, wavetable_name="", frame_index=0):
+def write_preset(path, parameters: dict, frames=None, wavetable_name="", frame_index=0,
+                 photo_jpeg=None, object_name=""):
     """Write an .ospreset that ObjectSynth's OPEN PRESET (and the host) can load."""
-    text = build_xml(parameters, frames, wavetable_name, frame_index).encode("utf-8")
+    text = build_xml(parameters, frames, wavetable_name, frame_index,
+                     photo_jpeg, object_name).encode("utf-8")
     data = struct.pack("<II", JUCE_MAGIC_XML, len(text) + 1) + text + b"\x00"
     if len(data) > 2 * 1024 * 1024:
         raise ValueError("Preset larger than the synth's 2 MB limit.")

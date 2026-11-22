@@ -15,6 +15,8 @@ The macros are normalised with macro_calibration.json (see calibrate_dis5k.py).
 
 import json
 
+import cv2
+
 import macros
 from macro_mapping import preset_parameters
 from ospreset import write_preset
@@ -75,6 +77,50 @@ def wavetable_frames(image_path, mask_path):
     return build_wavetable(data).reshape(FRAME_COUNT, -1)
 
 
+PHOTO_LONG_SIDE = 320      # thumbnail size in pixels (long side)
+PHOTO_MARGIN = 0.12        # space around the object, as a share of its size
+PHOTO_JPEG_QUALITY = 85
+
+
+def object_photo(image_path, mask_path):
+    """JPEG thumbnail of the object: cropped around the SAM mask, background
+    darkened, mask outline drawn, so the synth shows what was photographed."""
+    image = cv2.imread(str(image_path))
+    mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
+    if image is None or mask is None:
+        return None
+    mask = cv2.resize(mask, (image.shape[1], image.shape[0]), interpolation=cv2.INTER_NEAREST) > 127
+    if not mask.any():
+        return None
+
+    ys, xs = np.nonzero(mask)
+    x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+    margin = int(max(x1 - x0, y1 - y0) * PHOTO_MARGIN)
+    x0, y0 = max(0, x0 - margin), max(0, y0 - margin)
+    x1, y1 = min(image.shape[1], x1 + margin), min(image.shape[0], y1 + margin)
+    # 4:3 like a camera frame, centred on the object.
+    width, height = x1 - x0, y1 - y0
+    if width < height * 4 / 3:
+        extra = int(height * 4 / 3 - width) // 2
+        x0, x1 = max(0, x0 - extra), min(image.shape[1], x1 + extra)
+    else:
+        extra = int(width * 3 / 4 - height) // 2
+        y0, y1 = max(0, y0 - extra), min(image.shape[0], y1 + extra)
+
+    crop = image[y0:y1, x0:x1].astype(np.float32)
+    crop_mask = mask[y0:y1, x0:x1]
+    crop[~crop_mask] *= 0.35
+    crop = crop.clip(0, 255).astype(np.uint8)
+    contours, _ = cv2.findContours(crop_mask.astype(np.uint8), cv2.RETR_EXTERNAL,
+                                   cv2.CHAIN_APPROX_NONE)
+    scale = PHOTO_LONG_SIDE / max(crop.shape[:2])
+    cv2.drawContours(crop, contours, -1, (235, 235, 235), max(1, round(1.5 / scale)), cv2.LINE_AA)
+    crop = cv2.resize(crop, (round(crop.shape[1] * scale), round(crop.shape[0] * scale)),
+                      interpolation=cv2.INTER_AREA)
+    ok, jpeg = cv2.imencode(".jpg", crop, [cv2.IMWRITE_JPEG_QUALITY, PHOTO_JPEG_QUALITY])
+    return jpeg.tobytes() if ok else None
+
+
 def make_preset(image_path, mask_path):
     values = macros.all_macros(image_path, mask_path)
     parameters = preset_parameters(values)
@@ -83,6 +129,7 @@ def make_preset(image_path, mask_path):
     path = write_preset(
         PRESET_DIRECTORY / f"{name}.ospreset", parameters,
         frames=frames, wavetable_name=name, frame_index=0,
+        photo_jpeg=object_photo(image_path, mask_path), object_name=name,
     )
     return path, values, parameters
 

@@ -404,12 +404,32 @@ bool ObjectSynthAudioProcessor::loadCustomWav(
     const bool firstWarning = result.seamWarning;
     publishCustomFrames(std::move(result.frames),
                         std::move(result.seamWarnings), file.getFileName());
+    setObjectPhoto({}, {});
     setWaveform(Waveform::Custom);
     message = "Wavetable loaded: " + file.getFileName() +
         " (" + juce::String(static_cast<int>(count)) + " frame(s))";
     if (firstWarning)
         message += " - SEAM WARNING on frame 1";
     return true;
+}
+
+juce::MemoryBlock ObjectSynthAudioProcessor::getObjectPhoto(juce::String& name) const
+{
+    std::lock_guard<std::mutex> lock(objectPhotoMutex);
+    name = objectName;
+    return objectPhoto;
+}
+
+void ObjectSynthAudioProcessor::setObjectPhoto(juce::MemoryBlock jpeg, const juce::String& name)
+{
+    {
+        std::lock_guard<std::mutex> lock(objectPhotoMutex);
+        if (jpeg == objectPhoto && name == objectName)
+            return;
+        objectPhoto = std::move(jpeg);
+        objectName = name;
+    }
+    objectPhotoVersion.fetch_add(1, std::memory_order_acq_rel);
 }
 
 juce::String ObjectSynthAudioProcessor::getCustomWavetableName() const
@@ -852,10 +872,21 @@ void ObjectSynthAudioProcessor::getStateInformation(juce::MemoryBlock& destData)
     // APVTS state may contain properties from a previously restored preset.
     // Build metadata from the live custom set, never from stale serialized data.
     for (const auto* property : {"customWavetableData", "customWavetableName",
-                                 "customFrameIndex", "customWavetableSeamWarning"})
+                                 "customFrameIndex", "customWavetableSeamWarning",
+                                 "objectPhoto", "objectName"})
         state.removeProperty(juce::Identifier(property), nullptr);
 
     state.setProperty("selectedWaveform", static_cast<int>(getWaveform()), nullptr);
+
+    {
+        juce::String name;
+        const auto photo = getObjectPhoto(name);
+        if (! photo.isEmpty())
+        {
+            state.setProperty("objectPhoto", photo.toBase64Encoding(), nullptr);
+            state.setProperty("objectName", name, nullptr);
+        }
+    }
 
     {
         std::lock_guard<std::mutex> lock(customTableMutex);
@@ -1007,10 +1038,23 @@ void ObjectSynthAudioProcessor::setStateInformation(const void* data, int sizeIn
         0, static_cast<int>(Waveform::Custom),
         static_cast<int>(restored.getProperty("selectedWaveform", 1)));
 
+    {
+        // Object photo of a camera preset; other presets clear it.
+        juce::MemoryBlock photo;
+        const auto encodedPhoto = restored.getProperty("objectPhoto").toString();
+        if (encodedPhoto.isEmpty() || ! photo.fromBase64Encoding(encodedPhoto)
+            || photo.getSize() > 512 * 1024)
+            photo.reset();
+        const auto photoName = photo.isEmpty() ? juce::String()
+                                               : restored.getProperty("objectName").toString();
+        setObjectPhoto(std::move(photo), photoName);
+    }
+
     // These fields belong to the immutable wavetable snapshots, not APVTS.
     // Avoid keeping a large, possibly stale Base64 blob inside APVTS state.
     for (const auto* property : {"customWavetableData", "customWavetableName",
-                                 "customFrameIndex", "customWavetableSeamWarning"})
+                                 "customFrameIndex", "customWavetableSeamWarning",
+                                 "objectPhoto", "objectName"})
         restored.removeProperty(juce::Identifier(property), nullptr);
 
     // A preset saved before a parameter existed (e.g. outputVolume,

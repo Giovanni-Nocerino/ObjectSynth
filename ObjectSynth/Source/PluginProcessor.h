@@ -91,6 +91,15 @@ public:
     }
     juce::String getCustomWavetableName() const;
 
+    // Photo of the object a camera preset was made from (small JPEG) and its
+    // name; empty for other presets. The version changes on every update so
+    // the editor knows when to decode it again.
+    juce::MemoryBlock getObjectPhoto(juce::String& name) const;
+    int getObjectPhotoVersion() const noexcept
+    {
+        return objectPhotoVersion.load(std::memory_order_acquire);
+    }
+
     // Diagnostics/tests: custom wavetable snapshots currently kept in memory.
     std::size_t getRetainedWavetableCount() const;
 
@@ -187,6 +196,11 @@ private:
     mutable std::mutex customTableMutex;
     juce::String customWavetableName;
     std::atomic<bool> customSeamWarning {false};
+    void setObjectPhoto(juce::MemoryBlock jpeg, const juce::String& name);
+    juce::MemoryBlock objectPhoto;
+    juce::String objectName;
+    mutable std::mutex objectPhotoMutex;
+    std::atomic<int> objectPhotoVersion {0};
     void publishCustomFrames(std::vector<CustomTable> frames,
                              std::vector<bool> seamWarnings,
                              const juce::String& name,
