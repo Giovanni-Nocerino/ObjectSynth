@@ -49,7 +49,7 @@ private:
     osui::FilterEnvelopePanel filterEnvelopePanel;
     osui::LFOPanel lfoPanel;
     osui::OutputPanel outputPanel;
-    juce::MidiKeyboardComponent midiKeyboard;
+    osui::MarbleKeyboard midiKeyboard;
 
     // 16:10 logical canvas: the sketch's grid keeps its original widths and
     // the effects column is added on the right instead of squeezing it.

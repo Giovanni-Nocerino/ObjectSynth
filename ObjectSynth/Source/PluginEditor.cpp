@@ -115,9 +115,15 @@ void ObjectSynthAudioProcessorEditor::timerCallback()
     }
 }
 
+// Camera body: pebbled leatherette behind the metal plates, lit from the top.
 void ObjectSynthAudioProcessorEditor::paint(juce::Graphics& g)
 {
-    g.fillAll(osui::background());
+    const auto r = getLocalBounds().toFloat();
+    g.setTiledImageFill(osui::leatheretteTile(), 0, 0, 1.0f);
+    g.fillRect(r);
+    g.setGradientFill(juce::ColourGradient(juce::Colours::white.withAlpha(0.04f), 0.0f, 0.0f,
+                                           juce::Colours::black.withAlpha(0.25f), 0.0f, r.getBottom(), false));
+    g.fillRect(r);
 }
 
 void ObjectSynthAudioProcessorEditor::resized()
@@ -205,6 +211,8 @@ void ObjectSynthAudioProcessorEditor::resized()
     lfoPanel.setBounds(bottomRow);
 
     // --- Keyboard: full width, five octaves + top C (36 white keys).
-    midiKeyboard.setBounds(keyboardArea);
-    midiKeyboard.setKeyWidth(static_cast<float>(keyboardArea.getWidth()) / 36.0f);
+    // Leatherette cheeks around the keys, like the covering of a camera body.
+    const auto keys = keyboardArea.reduced(22, 0).withTrimmedTop(10);
+    midiKeyboard.setBounds(keys);
+    midiKeyboard.setKeyWidth(static_cast<float>(keys.getWidth()) / 36.0f);
 }

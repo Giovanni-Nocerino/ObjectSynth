@@ -117,7 +117,7 @@ namespace osui
             switch (i)
             {
                 case 0: return cyan();
-                case 1: return orange();
+                case 1: return green();
                 default: return purple();
             }
         }
@@ -265,7 +265,7 @@ namespace osui
 
             // Compact, in-graph legend. White is the resulting response.
             constexpr const char* legends[] = {"LP", "HP", "BP", "TOTAL"};
-            const juce::Colour colours[] = {cyan(), orange(), purple(), text()};
+            const juce::Colour colours[] = {cyan(), green(), purple(), text()};
             float legendX = container.getX() + 15.0f;
             for (int i = 0; i < 4; ++i)
             {

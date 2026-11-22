@@ -3,6 +3,7 @@
 #include "Theme.h"
 #include "../PluginProcessor.h"
 #include "../CameraPipeline.h"
+#include "ModeDial.h"
 #include <array>
 #include <cmath>
 #include <memory>
@@ -23,46 +24,34 @@ namespace osui
             cameraButton.setTooltip("Photograph an object and load the preset made from it "
                                     "(opens the CV pipeline in Terminal). Click again to stop waiting.");
             cameraButton.onClick = [this] { toggleCamera(); };
+            cameraButton.getProperties().set(shutterButtonProperty(), true);
             addAndMakeVisible(cameraButton);
 
-            const std::array<juce::String, 5> names {
-                "SINE", "SAW", "SQUARE", "TRI", "CUSTOM"
-            };
-            for (std::size_t i = 0; i < buttons.size(); ++i)
+            modeDial.onChange = [this](int index)
             {
-                auto& button = buttons[i];
-                button.setButtonText(names[i]);
-                button.setMouseClickGrabsKeyboardFocus(false);
-                button.setWantsKeyboardFocus(false);
-                // One continuous segmented selector, as in the sketch.
-                int edges = 0;
-                if (i > 0) edges |= juce::Button::ConnectedOnLeft;
-                if (i + 1 < buttons.size()) edges |= juce::Button::ConnectedOnRight;
-                button.setConnectedEdges(edges);
-                button.onClick = [this, i]
-                {
-                    if (i == 4 && !processor.hasCustomWavetable()) return;
-                    processor.setWaveform(static_cast<Waveform>(i));
-                    refreshSelection();
-                };
-                addAndMakeVisible(button);
-            }
+                if (index == 4 && !processor.hasCustomWavetable()) return;
+                processor.setWaveform(static_cast<Waveform>(index));
+                refreshSelection();
+            };
+            modeDial.setTooltip("Waveform: turn the dial, click a mode or use the mouse wheel");
+            addAndMakeVisible(modeDial);
 
-            frameLabel.setFont(juce::Font(juce::FontOptions(10.0f)));
-            frameLabel.setColour(juce::Label::textColourId, muted());
-            frameLabel.setJustificationType(juce::Justification::centredLeft);
-            addAndMakeVisible(frameLabel);
-
-            frameSlider.setSliderStyle(juce::Slider::LinearHorizontal);
+            // The frame is chosen by turning the lens ring (circular drag).
+            frameSlider.setSliderStyle(juce::Slider::Rotary);
+            frameSlider.setRotaryParameters(-ringSweep, ringSweep, true);
             frameSlider.setTextBoxStyle(juce::Slider::NoTextBox, false, 0, 0);
             frameSlider.setRange(0.0, 1.0, 1.0);
             frameSlider.setMouseClickGrabsKeyboardFocus(false);
-            frameSlider.setTooltip("Select the wavetable frame. Sounding notes crossfade to it.");
+            frameSlider.getProperties().set(lensRingProperty(), true);
+            frameSlider.setMouseCursor(juce::MouseCursor::DraggingHandCursor);
+            frameSlider.setTooltip("Turn the lens ring to select the wavetable frame. "
+                                   "Sounding notes crossfade to it.");
             frameSlider.onValueChange = [this]
             {
                 if (processor.selectCustomFrame(
                         juce::roundToInt(frameSlider.getValue())))
                     refreshSelection();
+                repaint(plotArea);
             };
             addAndMakeVisible(frameSlider);
 
@@ -90,18 +79,22 @@ namespace osui
             ModulePanel::paint(g);
             if (plotArea.isEmpty()) return;
 
-            drawPlot(g, plotArea.toFloat());
-            auto plot = plotArea.toFloat().reduced(12.0f, 19.0f);
-            if (plot.getWidth() <= 1.0f || plot.getHeight() <= 1.0f) return;
-
-            g.setColour(muted());
-            g.setFont(juce::Font(juce::FontOptions(9.5f)));
-            g.drawText("AMPLITUDE", plotArea.getX() + 11, plotArea.getY() + 4,
-                       plotArea.getWidth() - 22, 13, juce::Justification::centredLeft);
-            g.drawText("TWO CYCLES", plotArea.getX() + 11, plotArea.getBottom() - 17,
-                       plotArea.getWidth() - 22, 13, juce::Justification::centredRight);
-
             const auto waveform = processor.getWaveform();
+            static const char* names[] { "SINE", "SAW", "SQUARE", "TRI", "CUSTOM" };
+            juce::String bottom = names[static_cast<int>(waveform)];
+            if (waveform == Waveform::Custom && processor.getCustomFrameCount() > 0)
+                bottom << "  FRAME " << (processor.getCustomFrameIndex() + 1)
+                       << "/" << processor.getCustomFrameCount();
+            const bool turnable = frameSlider.isEnabled();
+            const auto ringAngle = turnable
+                ? -ringSweep + 2.0f * ringSweep * static_cast<float>(frameSlider.valueToProportionOfLength(frameSlider.getValue()))
+                : 0.0f;
+            const auto glass = drawLens(g, plotArea.toFloat(), "OBJECTSYNTH  WAVETABLE  1:2048",
+                                        bottom, ringAngle, turnable);
+            const float radius = glass.getWidth() * 0.5f;
+            // Two cycles across the glass, inside a centred band.
+            const auto plot = glass.withSizeKeepingCentre(radius * 1.72f, radius * 1.15f);
+
             // Published snapshots remain alive for the processor's lifetime.
             const auto* custom = processor.getCustomWavetableForUI();
             const auto& builtIn = WavetableBank::builtIn().getTable(waveform);
@@ -126,10 +119,17 @@ namespace osui
                 if (i == 0) path.startNewSubPath(x, y);
                 else path.lineTo(x, y);
             }
-            g.setColour(cyan().withAlpha(0.13f));
-            g.strokePath(path, juce::PathStrokeType(6.0f));
-            g.setColour(cyan());
-            g.strokePath(path, juce::PathStrokeType(2.2f));
+            {
+                juce::Graphics::ScopedSaveState state(g);
+                juce::Path lensClip;
+                lensClip.addEllipse(glass);
+                g.reduceClipRegion(lensClip);
+                g.setColour(cyan().withAlpha(0.13f));
+                g.strokePath(path, juce::PathStrokeType(6.0f));
+                g.setColour(cyan());
+                g.strokePath(path, juce::PathStrokeType(2.2f));
+            }
+            drawLensGlare(g, glass);
         }
 
         void resized() override
@@ -140,10 +140,6 @@ namespace osui
             // Sketch order, top to bottom: display, waveform selector,
             // LOAD (+ reserved CV slot), file status, frame slider.
             // Built bottom-up so the display takes all remaining height.
-            auto frameRow = area.removeFromBottom(24);
-            frameLabel.setBounds(frameRow.removeFromLeft(84));
-            frameSlider.setBounds(frameRow);
-            area.removeFromBottom(10);
 
             statusLabel.setBounds(area.removeFromBottom(15));
             fileLabel.setBounds(area.removeFromBottom(16));
@@ -158,15 +154,11 @@ namespace osui
             cameraButton.setBounds(files);
             area.removeFromBottom(12);
 
-            auto selector = area.removeFromBottom(32);
-            const int cellWidth = selector.getWidth() / static_cast<int>(buttons.size());
-            for (std::size_t i = 0; i < buttons.size(); ++i)
-            {
-                auto cell = i + 1 == buttons.size() ? selector : selector.removeFromLeft(cellWidth);
-                buttons[i].setBounds(cell);
-            }
+            modeDial.setBounds(area.removeFromBottom(40));
             area.removeFromBottom(10);
             plotArea = area;
+            const int lens = juce::jmin(plotArea.getWidth(), plotArea.getHeight());
+            frameSlider.setBounds(plotArea.withSizeKeepingCentre(lens, lens));
         }
 
     private:
@@ -261,13 +253,9 @@ namespace osui
             frameSlider.setRange(0.0, static_cast<double>(juce::jmax(1, lastFrameCount - 1)), 1.0);
             frameSlider.setValue(static_cast<double>(lastFrameIndex), juce::dontSendNotification);
             frameSlider.setEnabled(lastFrameCount > 1 && lastWaveform == Waveform::Custom);
-            frameLabel.setText("FRAME " + juce::String(lastFrameCount > 0 ? lastFrameIndex + 1 : 0)
-                + "/" + juce::String(lastFrameCount), juce::dontSendNotification);
 
-            buttons[4].setEnabled(lastTable != nullptr);
-            for (std::size_t i = 0; i < buttons.size(); ++i)
-                buttons[i].setToggleState(static_cast<int>(i) == static_cast<int>(lastWaveform),
-                                          juce::dontSendNotification);
+            modeDial.setModeEnabled(4, lastTable != nullptr);
+            modeDial.setSelected(static_cast<int>(lastWaveform));
             const auto name = processor.getCustomWavetableName();
             fileLabel.setText(name.isEmpty() ? "No custom wavetable" : name,
                               juce::dontSendNotification);
@@ -291,14 +279,14 @@ namespace osui
         }
 
         ObjectSynthAudioProcessor& processor;
-        std::array<juce::TextButton, 5> buttons;
+        ModeDial modeDial { { "SINE", "SAW", "SQUARE", "TRI", "CUSTOM" } };
         juce::TextButton loadButton;
         juce::TextButton cameraButton;
         CameraPipeline camera;
         PowerButton power;
         std::unique_ptr<ButtonAttachment> powerAttachment;
+        static constexpr float ringSweep = 2.4f; // radians each side of the top
         juce::Slider frameSlider;
-        juce::Label frameLabel;
         juce::Label fileLabel, statusLabel;
         std::unique_ptr<juce::FileChooser> chooser;
         juce::Rectangle<int> plotArea;
