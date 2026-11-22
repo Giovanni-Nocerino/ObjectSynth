@@ -8,11 +8,11 @@ For every capture with a SAM mask:
      (object names come from object_names.json; unnamed captures keep their file name).
 
 Usage:
-  python make_presets.py              # all saved masks, recalibrates first
-  python make_presets.py --no-calibrate
+  python make_presets.py
+
+The macros are normalised with macro_calibration.json (see calibrate_dis5k.py).
 """
 
-import argparse
 import json
 
 import macros
@@ -88,22 +88,10 @@ def make_preset(image_path, mask_path):
 
 
 def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--no-calibrate", action="store_true",
-                        help="Keep the stored calibration instead of refitting it.")
-    args = parser.parse_args()
-
     pairs = saved_pairs()
     if not pairs:
         print(f"No capture/mask pairs found in {CAPTURE_DIRECTORY} and {MASK_DIRECTORY}.")
         return
-
-    if not args.no_calibrate:
-        measurements = [macros.raw_values(image, mask) for image, mask in pairs]
-        for name in measurements[0]:
-            entry = macros.calibrate(name, [m[name] for m in measurements])
-            print(f"{name} calibrated on {entry['samples']} captures "
-                  f"(raw {entry['min']:.3f} .. {entry['max']:.3f})")
 
     for image_path, mask_path in pairs:
         try:

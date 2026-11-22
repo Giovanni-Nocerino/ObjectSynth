@@ -1,19 +1,23 @@
 """Macro features measured on the photo and its SAM object mask.
 
-Spigolosita (sharpness): Harris corner detector (Harris & Stephens, 1988) in
-its Shi-Tomasi form (Shi & Tomasi, 1994), applied to the object silhouette.
+Spigolosita (sharpness): Harris corner response (Harris & Stephens, 1988) on
+the object silhouette; candidate corners are picked with OpenCV's
+goodFeaturesToTrack (quality threshold, minimum distance, non-max suppression)
+but scored with Harris, not with Shi-Tomasi's min eigenvalue.
 
 Luminosita (brightness): mean CIELAB L* inside the mask, after white-patch
 exposure normalisation.
 
-Corpo (body): linear size of the object in the frame plus its solidity.
+Corpo (body): linear size of the object in the frame.
 
 Movimento (movement): three ingredients, each mapped to its own sound part:
 asymmetry (mirror IoU on the principal axes), texture (Canny edge density,
-Canny 1986) and colourfulness (Hasler & Suesstrunk, 2003).
+Canny 1986) and colourfulness (mean CIELAB chroma C*).
 
-Raw scores are mapped to 0..1 with a calibration (min/max over all saved
-captures) stored in macro_calibration.json.
+Raw scores are mapped to 0..1 with a calibration stored in
+macro_calibration.json: the 5th..95th percentile of every macro over the
+DIS5K dataset (calibrate_dis5k.py), so one odd object does not stretch the
+scale.
 """
 
 import json
@@ -26,13 +30,15 @@ import numpy as np
 CV_DIRECTORY = Path(__file__).resolve().parent
 CALIBRATION_PATH = CV_DIRECTORY / "macro_calibration.json"
 
+LOW_PERCENTILE, HIGH_PERCENTILE = 5, 95
+
 # The silhouette is rescaled so its longer side has this many pixels: corner
 # responses then do not depend on how big the object is in the photo.
 NORMALISED_SIZE = 512
 CANVAS_PADDING = 48
 FRAME_BORDER = 4  # pixels: the mask counts as touching the photo border
 
-# Harris / Shi-Tomasi settings, in normalised-silhouette pixels.
+# Harris settings, in normalised-silhouette pixels.
 BLUR_SIGMA = 3.0  # removes pixel staircase on the mask edge
 BLOCK_SIZE = 9
 HARRIS_K = 0.04
@@ -46,7 +52,7 @@ BORDER_IGNORE = 12  # ignore corners created by the photo frame cutting the obje
 # so strengths are comparable across objects.
 REFERENCE_RESPONSE = 2.5e-4
 STRONG_CORNER = 0.25  # normalised strength above which a corner is counted
-COUNT_FOR_FULL = 10   # this many strong corners saturate the count term
+COUNT_SCALE = 10      # strong corners counted in units of this many (no ceiling)
 STRENGTH_WEIGHT = 0.6
 COUNT_WEIGHT = 0.4
 
@@ -124,12 +130,16 @@ def detect_sharp_corners(mask_path):
 
 
 def sharpness_raw(mask_path):
-    """Uncalibrated sharpness: strength of the sharpest tips plus how many there are."""
+    """Uncalibrated sharpness: strength of the sharpest tips plus how many there are.
+
+    No ceiling on either term: very spiky objects keep scoring higher, and the
+    calibration decides where 0 and 1 fall.
+    """
     _, corners = detect_sharp_corners(mask_path)
     strengths = np.sort([s for _, _, s in corners])[::-1]
-    strength = float(np.clip(strengths[:3].mean(), 0.0, 1.0)) if len(strengths) else 0.0
+    strength = float(strengths[:3].mean()) if len(strengths) else 0.0
     count = int(np.sum(strengths > STRONG_CORNER))
-    return STRENGTH_WEIGHT * strength + COUNT_WEIGHT * min(count / COUNT_FOR_FULL, 1.0)
+    return STRENGTH_WEIGHT * strength + COUNT_WEIGHT * count / COUNT_SCALE
 
 
 WHITE_PATCH_PERCENTILE = 99  # brightest scene pixels taken as the white reference
@@ -160,34 +170,16 @@ def brightness_raw(image_path, mask_path):
     return float(lightness[mask].mean())
 
 
-BODY_SIZE_WEIGHT = 0.7
-BODY_SOLIDITY_WEIGHT = 0.3
-
-
 def body_raw(mask_path):
-    """How big and "full" the object looks in the photo.
-
-    Size: sqrt of the mask's share of the frame, i.e. its linear size (it
-    changes with the distance from the camera, which is accepted: the same
-    object gives different presets near and far). Solidity: area / convex hull
-    area, 1 for full shapes, lower for thin or open ones (keys, headphones).
+    """How big the object looks in the photo: sqrt of the mask's share of the
+    frame, i.e. its linear size. It changes with the distance from the camera,
+    which is accepted: the same object gives different presets near and far.
     """
     mask = cv2.imread(str(mask_path), cv2.IMREAD_GRAYSCALE)
     if mask is None:
         raise ValueError(f"Could not open mask: {mask_path}")
-    mask = (mask > 127).astype(np.uint8)
-    count, labels, stats, _ = cv2.connectedComponentsWithStats(mask)
-    if count < 2:
-        raise ValueError(f"Mask is empty: {mask_path}")
-    mask = (labels == 1 + int(np.argmax(stats[1:, cv2.CC_STAT_AREA]))).astype(np.uint8)
-
-    contour = max(cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)[0],
-                  key=cv2.contourArea)
-    area = cv2.contourArea(contour)
-    hull_area = cv2.contourArea(cv2.convexHull(contour))
-    linear_size = float(np.sqrt(area / mask.size))
-    solidity = float(area / hull_area) if hull_area > 0 else 0.0
-    return BODY_SIZE_WEIGHT * linear_size + BODY_SOLIDITY_WEIGHT * solidity
+    mask = _largest_component((mask > 127).astype(np.uint8))
+    return float(np.sqrt(mask.sum() / mask.size))
 
 
 def _largest_component(mask):
@@ -255,12 +247,17 @@ def texture_raw(image_path, mask_path):
 
 
 def colorfulness_raw(image_path, mask_path):
-    """Hasler & Suesstrunk (2003) colourfulness of the object's pixels."""
+    """Mean CIELAB chroma C* = sqrt(a*^2 + b*^2) of the object's pixels.
+
+    Same perceptual space and white-patch normalisation as the brightness, so
+    a grey object gives ~0 whatever its lightness.
+    """
     image, mask = _read_pair(image_path, mask_path)
-    blue, green, red = (image[..., i][mask > 0].astype(np.float64) for i in range(3))
-    rg = red - green
-    yb = 0.5 * (red + green) - blue
-    return float(np.hypot(rg.std(), yb.std()) + 0.3 * np.hypot(rg.mean(), yb.mean()))
+    image = image.astype(np.float32) / 255.0
+    white = max(float(np.percentile(image.max(axis=2), WHITE_PATCH_PERCENTILE)), 1e-3)
+    lab = cv2.cvtColor(np.clip(image / white, 0.0, 1.0), cv2.COLOR_BGR2LAB)
+    chroma = np.hypot(lab[..., 1], lab[..., 2])
+    return float(chroma[mask > 0].mean())
 
 
 def load_calibration():
@@ -273,11 +270,15 @@ def save_calibration(calibration):
     CALIBRATION_PATH.write_text(json.dumps(calibration, indent=2) + "\n")
 
 
-def calibrate(name, raw_values):
-    """Store the min/max of a raw macro over a set of objects."""
+def calibrate(name, raw_values, source):
+    """Store the 5th..95th percentile of a raw macro over a reference set."""
     calibration = load_calibration()
-    calibration[name] = {"min": float(min(raw_values)), "max": float(max(raw_values)),
-                         "samples": len(raw_values)}
+    calibration[name] = {
+        "min": float(np.percentile(raw_values, LOW_PERCENTILE)),
+        "max": float(np.percentile(raw_values, HIGH_PERCENTILE)),
+        "samples": len(raw_values),
+        "source": source,
+    }
     save_calibration(calibration)
     return calibration[name]
 
