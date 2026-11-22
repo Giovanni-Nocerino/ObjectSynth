@@ -164,10 +164,13 @@ def run_sam(image, image_path):
                     model = SAM(str(MODEL_PATH))
 
                 print("Segmenting image...")
+                # One extra level of nesting = all clicks are ONE prompt for one
+                # object. A flat list would make Ultralytics treat every click as
+                # a separate object, so the - points would never carve the mask.
                 results = model.predict(
                     source=image,
-                    points=state["points"],
-                    labels=state["labels"],
+                    points=[state["points"]],
+                    labels=[state["labels"]],
                     verbose=False,
                 )
                 result = results[0]
