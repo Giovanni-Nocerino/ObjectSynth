@@ -42,6 +42,12 @@ target_sources(ObjectSynth PRIVATE
 
 target_compile_features(ObjectSynth PRIVATE cxx_std_17)
 
+# The CAMERA button runs this checkout's CV pipeline (CV/run_pipeline.py with .venv).
+get_filename_component(OBJECTSYNTH_REPO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/.." ABSOLUTE)
+target_compile_definitions(ObjectSynth PRIVATE
+    OBJECTSYNTH_REPO_DIR="${OBJECTSYNTH_REPO_DIR}"
+)
+
 target_compile_definitions(ObjectSynth PUBLIC
     JUCE_WEB_BROWSER=0
     JUCE_USE_CURL=0

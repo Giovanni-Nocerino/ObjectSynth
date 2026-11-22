@@ -2,6 +2,7 @@
 
 #include "Theme.h"
 #include "../PluginProcessor.h"
+#include "../CameraPipeline.h"
 #include <array>
 #include <cmath>
 #include <memory>
@@ -18,9 +19,10 @@ namespace osui
                              processor.getAPVTS(), "oscillatorEnabled");
             setPowerIndicator(power);
 
-            cameraButton.setButtonText("CAMERA / CV");
-            cameraButton.setEnabled(false); // Reserved for future image sonification.
-            cameraButton.setTooltip("Future camera / Computer Vision source (not yet implemented)");
+            cameraButton.setButtonText("FROM CAMERA");
+            cameraButton.setTooltip("Photograph an object and load the preset made from it "
+                                    "(opens the CV pipeline in Terminal). Click again to stop waiting.");
+            cameraButton.onClick = [this] { toggleCamera(); };
             addAndMakeVisible(cameraButton);
 
             const std::array<juce::String, 5> names {
@@ -168,6 +170,52 @@ namespace osui
         }
 
     private:
+        void toggleCamera()
+        {
+            if (camera.isRunning())
+            {
+                camera.cancel();
+                showCameraState();
+                showStatus("Stopped waiting for the camera", false);
+                return;
+            }
+            juce::String message;
+            const bool ok = camera.start(message);
+            showCameraState();
+            showStatus(message, ok);
+        }
+
+        void pollCamera()
+        {
+            CameraPipeline::Result result;
+            if (camera.poll(result) != CameraPipeline::State::Finished) return;
+            showCameraState();
+            if (!result.ok)
+            {
+                showStatus(result.cancelled ? "Camera closed, no preset" : result.message, false);
+                return;
+            }
+            juce::String message;
+            const bool ok = processor.loadPresetFile(result.preset, message);
+            refreshSelection();
+            showStatus(ok ? "Loaded preset: " + result.preset.getFileNameWithoutExtension()
+                          : message, ok);
+        }
+
+        void showCameraState()
+        {
+            cameraButton.setButtonText(camera.isRunning() ? "WAITING..." : "FROM CAMERA");
+            cameraButton.setToggleState(camera.isRunning(), juce::dontSendNotification);
+        }
+
+        // Overrides the wavetable status until the next selection change.
+        void showStatus(const juce::String& message, bool ok)
+        {
+            statusLabel.setText(message, juce::dontSendNotification);
+            statusLabel.setColour(juce::Label::textColourId, ok ? cyan() : orange());
+            statusLabel.setTooltip(message);
+        }
+
         void chooseWav()
         {
             chooser = std::make_unique<juce::FileChooser>(
@@ -194,6 +242,7 @@ namespace osui
 
         void timerCallback() override
         {
+            pollCamera();
             const auto newWaveform = processor.getWaveform();
             const auto* newTable = processor.getCustomWavetableForUI();
             if (newWaveform != lastWaveform || newTable != lastTable ||
@@ -245,6 +294,7 @@ namespace osui
         std::array<juce::TextButton, 5> buttons;
         juce::TextButton loadButton;
         juce::TextButton cameraButton;
+        CameraPipeline camera;
         PowerButton power;
         std::unique_ptr<ButtonAttachment> powerAttachment;
         juce::Slider frameSlider;
