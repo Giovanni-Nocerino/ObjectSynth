@@ -20,6 +20,11 @@ def ease_out(macro, start, end, power=0.5):
     return start + (end - start) * macro ** power
 
 
+def ease_in(macro, start, end, power=3.0):
+    """Starts slowly, grows mostly near the top: only high values have a strong effect."""
+    return start + (end - start) * macro ** power
+
+
 def threshold(macro, at):
     return 1.0 if macro >= at else 0.0
 
@@ -93,9 +98,11 @@ def movement_parameters(asymmetry, texture, colorfulness):
         "lfoRoute1Destination": float(LFO_DESTINATION_LP_CUTOFF),
         "lfoRoute1Depth": linear(texture, 0.1, 0.6),
         # Colourfulness -> chorus: vivid colours give a richer, moving sound.
-        "chorusEnabled": threshold(colorfulness, 0.3),
-        "chorusMix": linear(colorfulness, 0.0, 0.5),
-        "chorusDepth": linear(colorfulness, 0.2, 0.7),
+        # Only clearly colourful objects get it (skin is ~0.6), and gently:
+        # the mix stays low until the most vivid colours.
+        "chorusEnabled": threshold(colorfulness, 0.5),
+        "chorusMix": ease_in(colorfulness, 0.08, 0.30),
+        "chorusDepth": linear(colorfulness, 0.15, 0.45),
     }
 
 
