@@ -22,7 +22,7 @@ namespace osui
 
             cameraButton.setButtonText("FROM CAMERA");
             cameraButton.setTooltip("Photograph an object and load the preset made from it "
-                                    "(opens the CV pipeline in Terminal). Click again to stop waiting.");
+                                    "(opens the CV pipeline in a terminal). Click again to stop waiting.");
             cameraButton.onClick = [this] { toggleCamera(); };
             cameraButton.getProperties().set(shutterButtonProperty(), true);
             addAndMakeVisible(cameraButton);

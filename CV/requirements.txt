@@ -1,0 +1,8 @@
+# Python packages for the CV pipeline (camera -> SAM mask -> wavetable -> .ospreset).
+# Tested with Python 3.12. Install into the repository's .venv (see README.md).
+ultralytics==8.4.190
+opencv-python==5.0.0.93
+numpy==2.5.4
+torch==2.14.1
+torchvision==0.29.1
+pillow==13.0.0
