@@ -13,8 +13,8 @@ namespace osui
         explicit DistortionPanel(APVTS& state)
             : ModulePanel("DIST.")
         {
-            setupKnob(*this, knobs[0], state, "distortionDrive", "DRIVE", orange());
-            setupKnob(*this, knobs[1], state, "distortionMix", "DRY / WET", orange());
+            setupKnob(*this, knobs[0], state, "distortionDrive", "DRIVE", green());
+            setupKnob(*this, knobs[1], state, "distortionMix", "DRY / WET", green());
 
             // The 1..10 knob is a gain of 0..+36 dB into the clipper
             // (Saturator::driveToDecibels): show what it really does.

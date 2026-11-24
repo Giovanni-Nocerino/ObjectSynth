@@ -204,7 +204,7 @@ namespace osui
         void showStatus(const juce::String& message, bool ok)
         {
             statusLabel.setText(message, juce::dontSendNotification);
-            statusLabel.setColour(juce::Label::textColourId, ok ? cyan() : orange());
+            statusLabel.setColour(juce::Label::textColourId, ok ? cyan() : red());
             statusLabel.setTooltip(message);
         }
 
@@ -226,7 +226,7 @@ namespace osui
                     if (!ok)
                     {
                         safe->statusLabel.setText(message, juce::dontSendNotification);
-                        safe->statusLabel.setColour(juce::Label::textColourId, orange());
+                        safe->statusLabel.setColour(juce::Label::textColourId, red());
                     }
                     safe->statusLabel.setTooltip(message);
                 });
@@ -267,7 +267,7 @@ namespace osui
                                              : "Custom WAV ready",
                                     juce::dontSendNotification);
                 statusLabel.setColour(juce::Label::textColourId,
-                                      warning ? orange() : cyan());
+                                      warning ? red() : cyan());
             }
             else
             {

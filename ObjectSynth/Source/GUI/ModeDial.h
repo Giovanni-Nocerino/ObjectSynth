@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Theme.h"
+#include <juce_audio_processors/juce_audio_processors.h>
 #include <cmath>
 #include <functional>
 
@@ -31,6 +32,8 @@ namespace osui
             else startTimerHz(60);
             repaint();
         }
+
+        int getSelected() const noexcept { return selected; }
 
         void setModeEnabled(int index, bool isEnabled)
         {
@@ -187,5 +190,33 @@ namespace osui
         float position = 0.0f, target = 0.0f, dragStart = 0.0f;
         int selected = 0;
         bool dragged = false;
+    };
+
+    // Keeps a ModeDial and a choice parameter (index = mode) in sync, like a
+    // ComboBoxAttachment does for a ComboBox.
+    class ModeDialAttachment
+    {
+    public:
+        ModeDialAttachment(juce::AudioProcessorValueTreeState& state, const juce::String& parameterID,
+                           ModeDial& dialToUse)
+            : dial(dialToUse),
+              attachment(*state.getParameter(parameterID),
+                         [this](float value) { dial.setSelected(juce::roundToInt(value)); })
+        {
+            dial.onChange = [this](int index)
+            {
+                attachment.setValueAsCompleteGesture(static_cast<float>(index));
+                if (onChange) onChange(index);
+            };
+            attachment.sendInitialUpdate();
+        }
+
+        ~ModeDialAttachment() { dial.onChange = nullptr; }
+
+        std::function<void(int)> onChange;  // after the parameter is set
+
+    private:
+        ModeDial& dial;
+        juce::ParameterAttachment attachment;
     };
 }

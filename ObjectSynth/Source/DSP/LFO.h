@@ -2,11 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
+#include <cstddef>
 
 class LFO final {
 public:
     enum class Waveform {
-        Sine, Saw, Square, Triangle
+        Sine, Saw, Square, Triangle,
+        Custom // one cycle of the oscillator's custom wavetable frame
     };
 
     bool prepare(double newSampleRate) noexcept {
@@ -39,11 +41,20 @@ public:
             case Waveform::Saw:
             case Waveform::Square:
             case Waveform::Triangle:
+            case Waveform::Custom:
                 waveform = newWaveform;
                 break;
             default:
                 break;
         }
+    }
+
+    // Table read by Waveform::Custom (one cycle, values in -1..1). Set once per
+    // block by the owner, which keeps it alive for that block; nullptr makes
+    // Custom fall back to a sine.
+    void setCustomTable(const float* samples, std::size_t size) noexcept {
+        customTable = size > 1 ? samples : nullptr;
+        customTableSize = customTable != nullptr ? size : 0;
     }
 
     void reset(double newPhase = 0.0) noexcept {
@@ -85,6 +96,10 @@ public:
         case Waveform::Triangle:
             value = 1.0 - 4.0 * std::abs(phase - 0.5);
             break;
+
+        case Waveform::Custom:
+            value = customTable != nullptr ? readCustom(phase) : std::sin(twoPi * phase);
+            break;
         }
         
         phase += phaseIncrement;
@@ -96,6 +111,14 @@ public:
 
 
 private:
+    // Linear interpolation, wrapping at the end of the cycle.
+    double readCustom(double atPhase) const noexcept {
+        const double position = atPhase * static_cast<double>(customTableSize);
+        const auto i = static_cast<std::size_t>(position) % customTableSize;
+        const auto next = (i + 1) % customTableSize;
+        const double fraction = position - std::floor(position);
+        return customTable[i] + (customTable[next] - customTable[i]) * fraction;
+    }
     
     static constexpr double twoPi = 6.28318530717958647692;
     // Wide enough for tempo-synced rates (4 bars at slow tempos up to 1/32 at fast ones).
@@ -109,6 +132,8 @@ private:
     double phaseIncrement = 0.0;
 
     Waveform waveform = Waveform::Sine;
+    const float* customTable = nullptr;
+    std::size_t customTableSize = 0;
     bool prepared = false;
 
 };

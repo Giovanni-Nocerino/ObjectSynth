@@ -16,7 +16,6 @@ namespace osui
     inline juce::Colour muted()      { return juce::Colour::fromRGB(160, 164, 170); }
     // Value colours (names kept from the original theme).
     inline juce::Colour cyan()       { return juce::Colour::fromRGB(233, 230, 222); } // ivory
-    inline juce::Colour orange()     { return juce::Colour::fromRGB(226, 161, 74); }  // brass
     inline juce::Colour purple()     { return juce::Colour::fromRGB(168, 136, 245); } // lens-coating violet
     inline juce::Colour green()      { return juce::Colour::fromRGB(112, 214, 162); } // lens-coating green
     inline juce::Colour red()        { return juce::Colour::fromRGB(226, 38, 30); }   // accent, sparingly
@@ -222,6 +221,107 @@ namespace osui
         return id;
     }
 
+    // Marks a vertical slider drawn as a mixing-desk fader (output Volume):
+    // a recessed slot, an engraved dB scale and a gloss-black cap.
+    inline const juce::Identifier& faderProperty()
+    {
+        static const juce::Identifier id { "osFader" };
+        return id;
+    }
+
+    // Marks a horizontal slider drawn as an exposure-compensation scale
+    // (LFO route depth, -1..+1): ruler, red index, violet bar from 0.
+    inline const juce::Identifier& evScaleProperty()
+    {
+        static const juce::Identifier id { "osEvScale" };
+        return id;
+    }
+
+    // Marks a ComboBox drawn as a line of a camera menu on an LCD: no box,
+    // just the lettering (the panel draws the screen behind it).
+    inline const juce::Identifier& lcdMenuProperty()
+    {
+        static const juce::Identifier id { "osLcdMenu" };
+        return id;
+    }
+
+    // dB marks engraved beside the fader.
+    inline const std::array<int, 6>& faderMarks()
+    {
+        static const std::array<int, 6> marks { 6, 0, -6, -12, -24, -48 };
+        return marks;
+    }
+
+    // Value readout styled like the small LCD on a camera's top plate:
+    // recessed black glass, ivory DIN digits, the unit smaller and dimmer.
+    class LcdReadout final : public juce::Label
+    {
+    public:
+        LcdReadout()
+        {
+            setJustificationType(juce::Justification::centred);
+            setKeyboardType(juce::TextInputTarget::decimalKeyboard);
+            setColour(juce::TextEditor::textColourId, text());
+            setColour(juce::TextEditor::backgroundColourId, juce::Colours::transparentBlack);
+            setColour(juce::TextEditor::highlightColourId, purple().withAlpha(0.4f));
+            setColour(juce::TextEditor::outlineColourId, juce::Colours::transparentBlack);
+            setColour(juce::TextEditor::focusedOutlineColourId, juce::Colours::transparentBlack);
+            setColour(juce::CaretComponent::caretColourId, text());
+        }
+
+        void paint(juce::Graphics& g) override
+        {
+            const auto r = getLocalBounds().toFloat().reduced(0.5f);
+            const float corner = 3.0f;
+
+            // Bevel: a light edge below, the glass set into the plate.
+            g.setColour(juce::Colours::white.withAlpha(0.07f));
+            g.drawRoundedRectangle(r.translated(0.0f, 1.0f), corner, 1.0f);
+            g.setGradientFill(juce::ColourGradient(juce::Colour::fromRGB(6, 7, 8), 0.0f, r.getY(),
+                                                   juce::Colour::fromRGB(16, 17, 20), 0.0f, r.getBottom(), false));
+            g.fillRoundedRectangle(r, corner);
+            g.setGradientFill(juce::ColourGradient(coatingViolet().withAlpha(0.10f), r.getX(), r.getY(),
+                                                   coatingViolet().withAlpha(0.0f), r.getX() + r.getWidth() * 0.6f,
+                                                   r.getY(), false));
+            g.fillRoundedRectangle(r, corner);
+            g.setColour(juce::Colours::black);
+            g.drawRoundedRectangle(r, corner, 1.0f);
+
+            if (isBeingEdited())
+                return;
+
+            // Split "11993 Hz" into the number and its unit.
+            const auto value = getText();
+            auto number = value, unit = juce::String();
+            const int space = value.lastIndexOfChar(' ');
+            if (space > 0 && ! value.substring(space + 1).containsAnyOf("0123456789"))
+            {
+                number = value.substring(0, space);
+                unit = value.substring(space + 1);
+            }
+
+            const float alpha = isEnabled() ? 1.0f : 0.4f;
+            const auto numberFont = osui::font(juce::jmin(15.0f, r.getHeight() * 0.72f));
+            const auto unitFont = osui::font(juce::jmin(10.0f, r.getHeight() * 0.5f));
+            const float numberWidth = juce::GlyphArrangement::getStringWidth(numberFont, number);
+            const float unitWidth = unit.isEmpty() ? 0.0f : juce::GlyphArrangement::getStringWidth(unitFont, unit) + 3.0f;
+            float x = r.getCentreX() - (numberWidth + unitWidth) * 0.5f;
+
+            g.setFont(numberFont);
+            g.setColour(findColour(juce::Label::textColourId).withMultipliedAlpha(alpha));
+            g.drawText(number, juce::Rectangle<float>(x, r.getY(), numberWidth + 1.0f, r.getHeight()),
+                       juce::Justification::centredLeft, false);
+            if (unit.isNotEmpty())
+            {
+                x += numberWidth + 3.0f;
+                g.setFont(unitFont);
+                g.setColour(muted().withMultipliedAlpha(alpha));
+                g.drawText(unit, juce::Rectangle<float>(x, r.getY() + 1.0f, unitWidth, r.getHeight()),
+                           juce::Justification::centredLeft, false);
+            }
+        }
+    };
+
     class LookAndFeel final : public juce::LookAndFeel_V4
     {
     public:
@@ -392,6 +492,170 @@ namespace osui
         }
 
         // Inline knobs: dial on the left, caption + value box stacked on the right.
+        static constexpr float faderCapHeight = 24.0f;
+
+        int getSliderThumbRadius(juce::Slider& slider) override
+        {
+            if (slider.getProperties()[faderProperty()])
+                return juce::roundToInt(faderCapHeight * 0.5f);
+            if (slider.getProperties()[evScaleProperty()])
+                return 8;
+            return juce::LookAndFeel_V4::getSliderThumbRadius(slider);
+        }
+
+        void drawLinearSlider(juce::Graphics& g, int x, int y, int width, int height,
+                              float sliderPos, float minPos, float maxPos,
+                              juce::Slider::SliderStyle style, juce::Slider& slider) override
+        {
+            if (slider.getProperties()[evScaleProperty()] && style == juce::Slider::LinearHorizontal)
+            {
+                drawEvScale(g, juce::Rectangle<int>(x, y, width, height).toFloat(), sliderPos, slider);
+                return;
+            }
+            if (! slider.getProperties()[faderProperty()] || style != juce::Slider::LinearVertical)
+            {
+                juce::LookAndFeel_V4::drawLinearSlider(g, x, y, width, height, sliderPos,
+                                                       minPos, maxPos, style, slider);
+                return;
+            }
+
+            const auto area = juce::Rectangle<int>(x, y, width, height).toFloat();
+            const float scaleWidth = 26.0f;
+            const float trackX = area.getX() + scaleWidth + (area.getWidth() - scaleWidth) * 0.5f;
+
+            // Slot cut into the plate, along the whole travel. (minPos/maxPos
+            // are only meaningful for two-value sliders.)
+            juce::ignoreUnused(minPos, maxPos);
+            const auto bottom = static_cast<float>(slider.getPositionOfValue(slider.getMinimum()));
+            const auto top = static_cast<float>(slider.getPositionOfValue(slider.getMaximum()));
+            const auto slot = juce::Rectangle<float>(trackX - 3.0f, top - 4.0f, 6.0f, bottom - top + 8.0f);
+            g.setColour(juce::Colours::black);
+            g.fillRoundedRectangle(slot, 3.0f);
+            g.setColour(juce::Colours::white.withAlpha(0.07f));
+            g.drawRoundedRectangle(slot.translated(0.0f, 1.0f), 3.0f, 1.0f);
+
+            // Engraved scale: ticks on both sides of the slot, dB on the left.
+            g.setFont(font(10.0f));
+            for (const int db : faderMarks())
+            {
+                const auto ty = static_cast<float>(slider.getPositionOfValue(db));
+                const bool unity = db == 0;
+                const float reach = unity ? 18.0f : 13.0f;
+                g.setColour(unity ? text().withAlpha(0.75f) : muted().withAlpha(0.55f));
+                g.drawHorizontalLine(juce::roundToInt(ty), trackX - reach, trackX - 6.0f);
+                g.drawHorizontalLine(juce::roundToInt(ty), trackX + 6.0f, trackX + reach);
+                drawEngraved(g, db > 0 ? "+" + juce::String(db) : juce::String(db),
+                             juce::Rectangle<float>(area.getX(), ty - 7.0f, scaleWidth - 2.0f, 14.0f)
+                                 .toNearestInt(),
+                             juce::Justification::centredRight,
+                             unity ? text().withAlpha(0.85f) : muted());
+            }
+
+            // Cap: gloss black, ridged grip, red index line through the middle.
+            const auto cap = juce::Rectangle<float>(38.0f, faderCapHeight)
+                                 .withCentre({ trackX, sliderPos });
+            g.setColour(juce::Colours::black.withAlpha(0.45f));
+            g.fillRoundedRectangle(cap.translated(0.0f, 3.0f), 3.0f);
+            juce::Path capShape;
+            capShape.addRoundedRectangle(cap, 3.0f);
+            fillGloss(g, capShape, cap, slider.isMouseOverOrDragging() ? 1.25f : 1.0f);
+            for (const float offset : { -7.0f, -4.0f, 4.0f, 7.0f })
+            {
+                g.setColour(juce::Colours::black.withAlpha(0.6f));
+                g.drawHorizontalLine(juce::roundToInt(sliderPos + offset), cap.getX() + 5.0f, cap.getRight() - 5.0f);
+                g.setColour(juce::Colours::white.withAlpha(0.08f));
+                g.drawHorizontalLine(juce::roundToInt(sliderPos + offset) + 1, cap.getX() + 5.0f, cap.getRight() - 5.0f);
+            }
+            g.setColour(red());
+            g.fillRect(cap.getX() + 3.0f, sliderPos - 1.0f, cap.getWidth() - 6.0f, 2.0f);
+            g.setColour(juce::Colours::black);
+            g.drawRoundedRectangle(cap, 3.0f, 1.0f);
+        }
+
+        // Exposure compensation: -1 . . . . 0 . . . . +1 with a red index at the
+        // value and a violet bar from 0, like the EV scale in a viewfinder.
+        static void drawEvScale(juce::Graphics& g, juce::Rectangle<float> area,
+                                float sliderPos, juce::Slider& slider)
+        {
+            const bool active = slider.isEnabled();
+            const float alpha = active ? 1.0f : 0.35f;
+            const float baseline = area.getY() + area.getHeight() * 0.52f;
+            const auto xOf = [&slider](double value)
+            {
+                return static_cast<float>(slider.getPositionOfValue(value));
+            };
+
+            // Violet bar from 0 to the value, just above the baseline.
+            const float zero = xOf(0.0);
+            const auto bar = juce::Rectangle<float>(juce::jmin(zero, sliderPos), baseline - 5.0f,
+                                                    std::abs(sliderPos - zero), 4.0f);
+            g.setColour(purple().withAlpha(0.9f * alpha));
+            g.fillRect(bar);
+
+            // Ruler: a tick every 0.1, taller every 0.5.
+            g.setColour(text().withAlpha(0.55f * alpha));
+            g.drawHorizontalLine(juce::roundToInt(baseline), xOf(-1.0) - 1.0f, xOf(1.0) + 1.0f);
+            for (int i = -10; i <= 10; ++i)
+            {
+                const float tx = xOf(i / 10.0);
+                const bool major = i % 5 == 0;
+                g.setColour((i == 0 ? text() : text().withAlpha(major ? 0.65f : 0.35f)).withMultipliedAlpha(alpha));
+                g.fillRect(tx - 0.5f, baseline, 1.0f, major ? 6.0f : 3.0f);
+            }
+            g.setFont(font(10.0f));
+            for (const int i : { -10, -5, 0, 5, 10 })
+            {
+                const juce::String label = i == 0 ? "0" : i == -10 ? "-1" : i == 10 ? "+1"
+                                                    : i < 0 ? "-.5" : "+.5";
+                g.setColour((i == 0 ? text() : muted()).withMultipliedAlpha(alpha));
+                g.drawText(label, juce::Rectangle<float>(xOf(i / 10.0) - 14.0f, baseline + 6.0f, 28.0f, 12.0f),
+                           juce::Justification::centred, false);
+            }
+
+            // Red index pointing down at the value.
+            juce::Path index;
+            const float top = baseline - 13.0f;
+            index.addTriangle(sliderPos - 4.5f, top, sliderPos + 4.5f, top, sliderPos, top + 6.0f);
+            g.setColour(red().withMultipliedAlpha(active ? 1.0f : 0.5f));
+            g.fillPath(index);
+        }
+
+        // Camera-menu line: no box, a thin underline when hovered.
+        void drawComboBox(juce::Graphics& g, int width, int height, bool isButtonDown,
+                          int buttonX, int buttonY, int buttonW, int buttonH, juce::ComboBox& box) override
+        {
+            if (! box.getProperties()[lcdMenuProperty()])
+            {
+                juce::LookAndFeel_V4::drawComboBox(g, width, height, isButtonDown, buttonX, buttonY,
+                                                   buttonW, buttonH, box);
+                return;
+            }
+            if (box.isMouseOver(true) || isButtonDown)
+            {
+                g.setColour(juce::Colours::white.withAlpha(isButtonDown ? 0.10f : 0.05f));
+                g.fillRoundedRectangle(juce::Rectangle<int>(width, height).toFloat(), 3.0f);
+            }
+        }
+
+        void positionComboBoxText(juce::ComboBox& box, juce::Label& label) override
+        {
+            if (! box.getProperties()[lcdMenuProperty()])
+            {
+                juce::LookAndFeel_V4::positionComboBoxText(box, label);
+                return;
+            }
+            label.setBounds(box.getLocalBounds().withTrimmedLeft(2));
+            label.setFont(getComboBoxFont(box));
+        }
+
+        juce::Label* createSliderTextBox(juce::Slider& slider) override
+        {
+            auto* readout = new LcdReadout();
+            readout->setColour(juce::Label::textColourId, slider.findColour(juce::Slider::textBoxTextColourId));
+            readout->setFont(font(14.0f));
+            return readout;
+        }
+
         juce::Slider::SliderLayout getSliderLayout(juce::Slider& slider) override
         {
             if (! static_cast<bool>(slider.getProperties()[inlineKnobProperty()]))
@@ -411,7 +675,12 @@ namespace osui
         }
 
         // Fixed, legible menu text: JUCE otherwise scales it with the box height.
-        juce::Font getComboBoxFont(juce::ComboBox&) override { return font(13.0f); }
+        juce::Font getComboBoxFont(juce::ComboBox& box) override
+        {
+            if (box.getProperties()[lcdMenuProperty()])
+                return font(14.0f).withExtraKerningFactor(0.06f);
+            return font(13.0f);
+        }
         juce::Font getPopupMenuFont() override { return font(14.0f); }
 
         juce::Font getTextButtonFont(juce::TextButton&, int buttonHeight) override
@@ -600,7 +869,7 @@ namespace osui
     }
 
     // Gloss-black screen set into the plate, with a faint grid and reflection.
-    inline void drawPlot(juce::Graphics& g, juce::Rectangle<float> rect)
+    inline void drawPlot(juce::Graphics& g, juce::Rectangle<float> rect, bool grid = true)
     {
         g.setColour(juce::Colours::white.withAlpha(0.07f));                 // bevel light
         g.drawRoundedRectangle(rect.translated(0.0f, 1.0f), 6.0f, 1.0f);
@@ -611,7 +880,7 @@ namespace osui
 
         auto inner = rect.reduced(8.0f);
         g.setColour(juce::Colour::fromRGB(40, 42, 46).withAlpha(0.7f));
-        for (int i = 1; i < 4; ++i)
+        for (int i = 1; i < (grid ? 4 : 1); ++i)
         {
             const auto x = inner.getX() + inner.getWidth() * i / 4.0f;
             const auto y = inner.getY() + inner.getHeight() * i / 4.0f;

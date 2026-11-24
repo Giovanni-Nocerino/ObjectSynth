@@ -32,6 +32,10 @@ ObjectSynthAudioProcessorEditor::ObjectSynthAudioProcessorEditor(
     uiCanvas.addAndMakeVisible(outputPanel);
     uiCanvas.addAndMakeVisible(midiKeyboard);
 
+    // The panels were built (and their sliders made their value boxes) before
+    // they had this look and feel: let them rebuild those parts with it.
+    sendLookAndFeelChange();
+
     // Five octaves (C1..C6): on the wider canvas the keys keep about the
     // same proportions as the old four-octave keyboard.
     midiKeyboard.setAvailableRange(36, 96);

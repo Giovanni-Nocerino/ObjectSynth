@@ -150,7 +150,7 @@ ObjectSynthAudioProcessor::createParameterLayout(){
 
     layout.add(std::make_unique<juce::AudioParameterChoice>(
         juce::ParameterID {"lfoWaveform", 1}, "LFO Waveform",
-        juce::StringArray {"Sine", "Saw", "Square", "Triangle"}, 0));
+        juce::StringArray {"Sine", "Saw", "Square", "Triangle", "Custom"}, 0));
 
     // Replaces the old fixed 0.5 master attenuation.
     layout.add(std::make_unique<juce::AudioParameterFloat>(
@@ -631,12 +631,15 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     std::uint64_t oldestCustomSetInUse = customTableStore.nextId();
     const auto* customSet = currentCustomSet.load(std::memory_order_acquire);
     const BandLimitedWavetable* table = nullptr;
+    const CustomTable* lfoTable = nullptr; // same frame, read raw by the LFO
     std::uint64_t customSetId = 0;
     if (customSet != nullptr && ! customSet->bandLimited.empty())
     {
         const int frame = juce::jlimit(0, static_cast<int>(customSet->bandLimited.size()) - 1,
                                        currentCustomFrame.load(std::memory_order_acquire));
         table = &customSet->bandLimited[static_cast<std::size_t>(frame)];
+        if (static_cast<std::size_t>(frame) < customSet->frames.size())
+            lfoTable = &customSet->frames[static_cast<std::size_t>(frame)];
         customSetId = customSet->id;
         oldestCustomSetInUse = customSetId;
     }
@@ -677,6 +680,10 @@ void ObjectSynthAudioProcessor::processBlock(juce::AudioBuffer<float>& buffer,
     }
     globalLFO.setWaveform(static_cast<LFO::Waveform>(
         static_cast<int>(lfoWaveformParameter->load(std::memory_order_relaxed))));
+    // Custom reads the oscillator's frame; the set stays alive for this block
+    // (reported as in use below).
+    globalLFO.setCustomTable(lfoTable != nullptr ? lfoTable->data() : nullptr,
+                             lfoTable != nullptr ? lfoTable->size() : 0);
 
     const bool lfoEnabled = lfoEnabledParameter->load(std::memory_order_relaxed) > 0.5f;
     const bool filterBankEnabled = filterBankEnabledParameter->load(std::memory_order_relaxed) > 0.5f;

@@ -70,8 +70,7 @@ namespace osui
             addAndMakeVisible(saveButton);
             addAndMakeVisible(loadButton);
 
-            statusLabel.setText("8-voice polyphonic wavetable synthesizer",
-                                juce::dontSendNotification);
+            // Empty until a preset is saved or opened (then it shows the result).
             statusLabel.setFont(font(11.5f));
             statusLabel.setColour(juce::Label::textColourId, ink().withAlpha(0.6f));
             statusLabel.setJustificationType(juce::Justification::centredRight);

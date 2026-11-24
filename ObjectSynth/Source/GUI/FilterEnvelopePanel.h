@@ -34,7 +34,7 @@ namespace osui
                     (i == 5) ? " oct" : "";
 
                 setupKnob(*this, knobs[i], state,
-                          ids[i], names[i], orange(), suffix);
+                          ids[i], names[i], purple(), suffix);
                 knobs[i].slider.setTextBoxStyle(
                     juce::Slider::TextBoxBelow, false, 70, 19);
             }
@@ -178,7 +178,7 @@ namespace osui
             g.fillPath(dashed);
 
             // Envelope curve.
-            g.setColour(orange());
+            g.setColour(purple());
             g.strokePath(
                 curve,
                 juce::PathStrokeType(

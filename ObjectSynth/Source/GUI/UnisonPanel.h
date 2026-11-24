@@ -16,7 +16,7 @@ namespace osui
         {
             setupKnob(*this, knobs[0], state, "unisonCount", "VOICES", cyan());
             setupKnob(*this, knobs[1], state, "unisonDetune", "DETUNE", purple(), " cents");
-            setupKnob(*this, knobs[2], state, "unisonSpread", "SPREAD", orange());
+            setupKnob(*this, knobs[2], state, "unisonSpread", "SPREAD", green());
             // Spread is 0..1; show it as a percentage of the full stereo width.
             knobs[2].slider.textFromValueFunction = [](double value)
             { return juce::String(juce::roundToInt(value * 100.0)) + " %"; };
@@ -95,7 +95,7 @@ namespace osui
                        juce::Justification::centred);
             g.drawText("R", juce::Rectangle<float>(centerX + halfWidth + 4.0f, stripY - 6.0f, 10.0f, 12.0f),
                        juce::Justification::centred);
-            g.setColour(orange());
+            g.setColour(green());
             for (int i = 0; i < count; ++i)
             {
                 const float position = count == 1 ? 0.0f

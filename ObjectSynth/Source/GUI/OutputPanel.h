@@ -20,63 +20,67 @@ namespace osui
             startTimerHz(30);
         }
 
+        // Vertical, beside the Volume fader like a mixer channel strip: CLIP
+        // light on top, L and R bars, dBFS scale on the right.
         void paint(juce::Graphics& g) override
         {
             auto area = getLocalBounds().toFloat();
-            auto clipArea = area.removeFromRight(46.0f);
-            area.removeFromRight(8.0f);
-            auto scale = area.removeFromBottom(14.0f);
+            auto light = area.removeFromTop(20.0f);
+            area.removeFromTop(8.0f);
+            auto names = area.removeFromBottom(14.0f);
+            area.removeFromBottom(4.0f);
+            auto scale = area.removeFromRight(24.0f);
 
-            const float barHeight = (area.getHeight() - 6.0f) / 2.0f;
-            constexpr const char* names[] = {"L", "R"};
+            constexpr float barWidth = 9.0f, gap = 4.0f;
+            const float left = area.getCentreX() - barWidth - gap * 0.5f;
+            constexpr const char* channelNames[] = {"L", "R"};
             for (std::size_t ch = 0; ch < 2; ++ch)
             {
-                auto row = area.removeFromTop(barHeight);
-                if (ch == 0)
-                    area.removeFromTop(6.0f);
-
-                g.setColour(muted());
-                g.setFont(juce::Font(juce::FontOptions(11.0f, juce::Font::bold)));
-                g.drawText(names[ch], row.removeFromLeft(16.0f), juce::Justification::centredLeft);
-
+                const auto bar = juce::Rectangle<float>(left + static_cast<float>(ch) * (barWidth + gap),
+                                                        area.getY(), barWidth, area.getHeight());
+                g.setColour(juce::Colours::black);
+                g.fillRoundedRectangle(bar.expanded(1.0f), 2.0f);
                 g.setColour(plotFill());
-                g.fillRoundedRectangle(row, 3.0f);
-                const float fraction = toFraction(levels[ch]);
-                auto fill = row.withWidth(row.getWidth() * fraction);
-                juce::ColourGradient gradient(cyan(), row.getX(), 0.0f,
-                                              orange(), row.getRight(), 0.0f, false);
-                gradient.addColour(0.75, cyan());
-                g.setGradientFill(gradient);
-                g.fillRoundedRectangle(fill, 3.0f);
+                g.fillRoundedRectangle(bar, 2.0f);
 
-                const float holdX = row.getX() + row.getWidth() * toFraction(holds[ch]);
+                const auto fill = bar.withTrimmedTop(bar.getHeight() * (1.0f - toFraction(levels[ch])));
+                juce::ColourGradient gradient(red(), 0.0f, bar.getY(), cyan(), 0.0f, bar.getBottom(), false);
+                gradient.addColour(0.25, cyan());
+                g.setGradientFill(gradient);
+                g.fillRoundedRectangle(fill, 2.0f);
+
                 if (holds[ch] > 0.0f)
                 {
-                    g.setColour(text().withAlpha(0.8f));
-                    g.fillRect(holdX - 1.0f, row.getY(), 2.0f, row.getHeight());
+                    const float holdY = bar.getBottom() - bar.getHeight() * toFraction(holds[ch]);
+                    g.setColour(text().withAlpha(0.85f));
+                    g.fillRect(bar.getX(), holdY - 1.0f, bar.getWidth(), 2.0f);
                 }
-                g.setColour(panelEdge());
-                g.drawRoundedRectangle(row, 3.0f, 1.0f);
-                barX = row.getX();
-                barWidth = row.getWidth();
+
+                g.setFont(font(10.0f));
+                drawEngraved(g, channelNames[ch], bar.withY(names.getY()).withHeight(names.getHeight())
+                                                      .expanded(4.0f, 0.0f).toNearestInt(),
+                             juce::Justification::centred, muted());
+                barTop = bar.getY();
+                barHeight = bar.getHeight();
             }
 
-            // dBFS scale under the bars.
-            g.setFont(juce::Font(juce::FontOptions(9.5f)));
-            for (const int db : {-36, -24, -12, -6, 0})
+            g.setFont(font(9.5f));
+            for (const int db : {0, -12, -24, -36})
             {
-                const float x = barX + barWidth * toFraction(juce::Decibels::decibelsToGain(static_cast<float>(db)));
-                g.setColour(muted());
-                g.drawText(juce::String(db), juce::Rectangle<float>(x - 14.0f, scale.getY(), 28.0f, scale.getHeight()),
-                           juce::Justification::centred);
+                const float ty = barTop + barHeight * (1.0f - toFraction(juce::Decibels::decibelsToGain(static_cast<float>(db))));
+                drawEngraved(g, juce::String(db), juce::Rectangle<float>(scale.getX() + 2.0f, ty - 6.0f,
+                                                                         scale.getWidth() - 2.0f, 12.0f).toNearestInt(),
+                             juce::Justification::centredLeft, muted());
             }
 
-            // CLIP light.
-            auto light = clipArea.withSizeKeepingCentre(clipArea.getWidth(), 22.0f);
-            g.setColour(clipped ? juce::Colour::fromRGB(235, 70, 70) : plotFill());
-            g.fillRoundedRectangle(light, 5.0f);
+            // CLIP light: a red LED when the output hit 0 dBFS.
+            light = light.withSizeKeepingCentre(juce::jmin(light.getWidth(), 46.0f), light.getHeight());
+            g.setColour(clipped ? red() : plotFill());
+            g.fillRoundedRectangle(light, 4.0f);
+            g.setColour(juce::Colours::black);
+            g.drawRoundedRectangle(light, 4.0f, 1.0f);
             g.setColour(clipped ? juce::Colours::white : muted());
-            g.setFont(juce::Font(juce::FontOptions(10.5f, juce::Font::bold)));
+            g.setFont(font(10.5f).withExtraKerningFactor(0.08f));
             g.drawText("CLIP", light, juce::Justification::centred);
         }
 
@@ -123,7 +127,7 @@ namespace osui
         std::array<float, 2> levels {}, holds {};
         std::array<int, 2> holdAge {};
         bool clipped = false;
-        float barX = 0.0f, barWidth = 1.0f;
+        float barTop = 0.0f, barHeight = 1.0f;
     };
 
     // OUTPUT: final Volume and stereo balance (Pan), plus the level meter.
@@ -136,6 +140,10 @@ namespace osui
         {
             auto& state = p.getAPVTS();
             setupKnob(*this, volume, state, "outputVolume", "VOLUME", cyan(), " dB");
+            // Volume is a fader, not a knob.
+            volume.slider.setSliderStyle(juce::Slider::LinearVertical);
+            volume.slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 70, 20);
+            volume.slider.getProperties().set(faderProperty(), true);
             setupKnob(*this, pan, state, "outputPan", "PAN", purple());
 
             // "L 40" / "C" / "R 40" reads better than -0.40 .. 0.40.
@@ -159,8 +167,9 @@ namespace osui
             pan.slider.setTooltip("Output balance. Route the LFO to \"Pan\" for auto-pan.");
             pan.slider.getProperties().set(bipolarKnobProperty(), true);
 
-            meterLabel.setText("LEVEL (dBFS)", juce::dontSendNotification);
-            meterLabel.setFont(juce::Font(juce::FontOptions(10.5f)));
+            meterLabel.setText("LEVEL", juce::dontSendNotification);
+            meterLabel.setFont(juce::Font(juce::FontOptions(11.5f)));
+            meterLabel.setJustificationType(juce::Justification::centred);
             meterLabel.setColour(juce::Label::textColourId, muted());
             addAndMakeVisible(meterLabel);
             addAndMakeVisible(meter);
@@ -168,16 +177,22 @@ namespace osui
 
         void resized() override
         {
+            // Channel strip: [Volume fader] [L/R meter] [Pan].
             auto area = getBodyBounds();
-            auto knobs = area.removeFromTop(juce::jmin(110, area.getHeight() / 2));
-            const int width = knobs.getWidth() / 2;
-            positionKnob(volume, knobs.removeFromLeft(width), 56);
-            positionKnob(pan, knobs, 56);
+            auto faderColumn = area.removeFromLeft(juce::jmin(92, area.getWidth() / 3));
+            area.removeFromLeft(4);
+            auto meterColumn = area.removeFromLeft(juce::jmin(70, area.getWidth() / 2));
+            area.removeFromLeft(4);
 
-            area.removeFromTop(10);
-            meterLabel.setBounds(area.removeFromTop(16));
-            area.removeFromTop(4);
-            meter.setBounds(area.withHeight(juce::jmin(area.getHeight(), 66)));
+            volume.label.setBounds(faderColumn.removeFromTop(16));
+            faderColumn.removeFromTop(4);
+            volume.slider.setBounds(faderColumn);
+
+            meterLabel.setBounds(meterColumn.removeFromTop(16));
+            meterColumn.removeFromTop(4);
+            meter.setBounds(meterColumn.withTrimmedBottom(volume.slider.getTextBoxHeight() - 14));
+
+            positionKnob(pan, area.withSizeKeepingCentre(area.getWidth(), juce::jmin(area.getHeight(), 120)), 56);
         }
 
     private:
