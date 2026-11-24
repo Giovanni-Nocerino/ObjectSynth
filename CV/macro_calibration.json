@@ -12,10 +12,10 @@
     "source": "dis5k"
   },
   "body": {
-    "min": 0.18368917722782022,
-    "max": 0.6456412060012753,
-    "samples": 969,
-    "source": "dis5k"
+    "min": 0.08,
+    "max": 0.65,
+    "samples": 0,
+    "source": "fixed"
   },
   "asymmetry": {
     "min": 0.108819174659801,

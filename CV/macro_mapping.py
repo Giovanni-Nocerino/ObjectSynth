@@ -29,6 +29,13 @@ def threshold(macro, at):
     return 1.0 if macro >= at else 0.0
 
 
+def gated_linear(macro, at, start, end, below=0.0):
+    """`below` under the threshold, then linear from `start` (at `at`) to `end` (at 1)."""
+    if macro < at:
+        return below
+    return linear((macro - at) / (1.0 - at), start, end)
+
+
 def sharpness_parameters(s):
     """Spigolosita: soft/round objects stay clean, sharp ones bite and distort."""
     return {
@@ -63,6 +70,9 @@ def stepped(macro, start, end):
     return float(round(start + (end - start) * macro))
 
 
+PLUCK_BELOW = 0.3  # Corpo under this: sustain 0, a pluck
+
+
 def body_parameters(c):
     """Corpo: small objects sound thin and short, big ones thick, wide and long."""
     return {
@@ -71,8 +81,11 @@ def body_parameters(c):
         "unisonEnabled": threshold(c, 0.2),
         "unisonCount": stepped(c, 1, 7),
         "unisonSpread": linear(c, 0.2, 1.0),
-        # Big objects "ring" longer.
-        "sustain": linear(c, 0.4, 1.0),
+        # Small objects are plucks: no sustain, the note dies after the decay.
+        # From PLUCK_BELOW up the note holds, more for bigger objects.
+        "sustain": gated_linear(c, PLUCK_BELOW, 0.4, 0.9),
+        # Bigger objects ring longer: a longer pluck tail and a longer release.
+        "decay": exponential(c, 0.2, 1.2),
         "release": exponential(c, 0.1, 1.5),
     }
 

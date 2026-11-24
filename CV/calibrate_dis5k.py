@@ -10,7 +10,10 @@ CV/datasets/dis5k-download/DIS5K/DIS-*/im/ and the masks in .../gt/.
 DIS5K favours intricate objects (furniture, buildings, vehicles, insects), so
 the shape macros (SHAPE_MACROS: sharpness, asymmetry) are calibrated only on
 the everyday, hand-sized objects (EVERYDAY_GROUPS, EVERYDAY_TOOLS); the other
-macros on a random sample of the whole dataset. The category is in each file
+macros on a random sample of the whole dataset. Corpo (body, the object's size
+in the frame) is not taken from DIS5K: photographers frame objects much larger
+than our webcam at arm's length does (median linear size 0.40 vs 0.28), so it
+uses a fixed range (FIXED_RANGES). The category is in each file
 name: <n>#<Group>#<n>#<Subcategory>#<id>.jpg.
 
 Steps:
@@ -48,6 +51,11 @@ MIN_AREA_FRACTION, MAX_AREA_FRACTION = 0.02, 0.95
 SHAPE_MACROS = ("sharpness", "asymmetry")
 EVERYDAY_GROUPS = {"Kitchenware", "Accessories", "Electronics"}
 EVERYDAY_EXCLUDED = {"Antenna"}  # a structure, not a hand-sized object
+# Macros with a hand-chosen raw range instead of dataset percentiles.
+# body: 0 = a tiny object (a pencil) at webcam distance, 1 = one filling most of
+# the frame (sqrt of the mask's area fraction).
+FIXED_RANGES = {"body": (0.08, 0.65)}
+
 EVERYDAY_TOOLS = {
     "Key", "Clip", "Scissor", "Clock", "Stationary", "Scale", "Tapeline", "Comb",
     "Hammer", "Button", "Needle", "TobaccoPipe", "Stethoscope",
@@ -151,8 +159,12 @@ def main():
     everyday = measure([pair for pair in pairs if is_everyday(pair[0])], cache)
 
     names = next(iter(general.values())).keys()
-    calibrate([n for n in names if n not in SHAPE_MACROS], general, "dis5k")
+    calibrate([n for n in names if n not in SHAPE_MACROS and n not in FIXED_RANGES],
+              general, "dis5k")
     calibrate(SHAPE_MACROS, everyday, "dis5k-everyday")
+    for name, (low, high) in FIXED_RANGES.items():
+        macros.set_fixed_range(name, low, high, "fixed")
+        print(f"{name}: fixed raw range {low} .. {high}")
 
 
 if __name__ == "__main__":

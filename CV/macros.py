@@ -283,6 +283,14 @@ def calibrate(name, raw_values, source):
     return calibration[name]
 
 
+def set_fixed_range(name, low, high, source):
+    """Store a hand-chosen range for a macro that no dataset can calibrate."""
+    calibration = load_calibration()
+    calibration[name] = {"min": float(low), "max": float(high), "samples": 0, "source": source}
+    save_calibration(calibration)
+    return calibration[name]
+
+
 def normalise(name, raw):
     """Map a raw macro value to 0..1 with the stored calibration."""
     entry = load_calibration().get(name)
