@@ -1,26 +1,24 @@
 """Macro features measured on the photo and its SAM object mask.
 
-Spigolosita (sharpness): Harris corner response (Harris & Stephens, 1988) on
+Sharpness: Harris corner response (Harris & Stephens, 1988) on
 the object silhouette; candidate corners are picked with OpenCV's
 goodFeaturesToTrack (quality threshold, minimum distance, non-max suppression)
 but scored with Harris, not with Shi-Tomasi's min eigenvalue.
 
-Luminosita (brightness): mean CIELAB L* inside the mask, after white-patch
+Brightness: mean CIELAB L* inside the mask, after white-patch
 exposure normalisation.
 
-Corpo (body): linear size of the object in the frame.
+Body: linear size of the object in the frame.
 
-Movimento (movement): three ingredients, each mapped to its own sound part:
+Movement: three ingredients, each mapped to its own sound part:
 asymmetry (mirror IoU on the principal axes), texture (Canny edge density,
 Canny 1986) and colourfulness (mean CIELAB chroma C*).
 
-Raw scores are mapped to 0..1 with a calibration stored in
-macro_calibration.json: the 5th..95th percentile of every macro over the
-DIS5K dataset (calibrate_dis5k.py), so one odd object does not stretch the
-scale.
+Raw scores are mapped to 0..1 with a fixed range per macro (MACRO_RANGES):
+the raw value at `min` gives 0, at `max` gives 1, and values outside are
+clipped, so one odd object does not stretch the scale.
 """
 
-import json
 from pathlib import Path
 
 import cv2
@@ -28,9 +26,16 @@ import numpy as np
 
 
 CV_DIRECTORY = Path(__file__).resolve().parent
-CALIBRATION_PATH = CV_DIRECTORY / "macro_calibration.json"
 
-LOW_PERCENTILE, HIGH_PERCENTILE = 5, 95
+# Raw value giving 0 and raw value giving 1, per macro.
+MACRO_RANGES = {
+    "sharpness": (0.0337791204219684, 1.118572393668816),        # Harris tip score
+    "brightness": (18.921255111694336, 69.69278717041013),       # mean L* (0..100)
+    "body": (0.08, 0.65),                                        # object size / frame size
+    "asymmetry": (0.108819174659801, 0.8327812406284156),        # 1 - mirror IoU
+    "texture": (0.0025666777586676555, 0.09157268286631141),     # Canny edge density
+    "colorfulness": (3.511051225662232, 39.082034301757766),     # mean chroma C*
+}
 
 # The silhouette is rescaled so its longer side has this many pixels: corner
 # responses then do not depend on how big the object is in the photo.
@@ -130,10 +135,10 @@ def detect_sharp_corners(mask_path):
 
 
 def sharpness_raw(mask_path):
-    """Uncalibrated sharpness: strength of the sharpest tips plus how many there are.
+    """Raw sharpness: strength of the sharpest tips plus how many there are.
 
-    No ceiling on either term: very spiky objects keep scoring higher, and the
-    calibration decides where 0 and 1 fall.
+    No ceiling on either term: very spiky objects keep scoring higher, and
+    MACRO_RANGES decides where 0 and 1 fall.
     """
     _, corners = detect_sharp_corners(mask_path)
     strengths = np.sort([s for _, _, s in corners])[::-1]
@@ -260,62 +265,29 @@ def colorfulness_raw(image_path, mask_path):
     return float(chroma[mask > 0].mean())
 
 
-def load_calibration():
-    if CALIBRATION_PATH.is_file():
-        return json.loads(CALIBRATION_PATH.read_text())
-    return {}
-
-
-def save_calibration(calibration):
-    CALIBRATION_PATH.write_text(json.dumps(calibration, indent=2) + "\n")
-
-
-def calibrate(name, raw_values, source):
-    """Store the 5th..95th percentile of a raw macro over a reference set."""
-    calibration = load_calibration()
-    calibration[name] = {
-        "min": float(np.percentile(raw_values, LOW_PERCENTILE)),
-        "max": float(np.percentile(raw_values, HIGH_PERCENTILE)),
-        "samples": len(raw_values),
-        "source": source,
-    }
-    save_calibration(calibration)
-    return calibration[name]
-
-
-def set_fixed_range(name, low, high, source):
-    """Store a hand-chosen range for a macro that no dataset can calibrate."""
-    calibration = load_calibration()
-    calibration[name] = {"min": float(low), "max": float(high), "samples": 0, "source": source}
-    save_calibration(calibration)
-    return calibration[name]
-
-
 def normalise(name, raw):
-    """Map a raw macro value to 0..1 with the stored calibration."""
-    entry = load_calibration().get(name)
-    if not entry or entry["max"] - entry["min"] < 1e-9:
-        return float(np.clip(raw, 0.0, 1.0))
-    return float(np.clip((raw - entry["min"]) / (entry["max"] - entry["min"]), 0.0, 1.0))
+    """Map a raw macro value to 0..1 with its range in MACRO_RANGES."""
+    low, high = MACRO_RANGES[name]
+    return float(np.clip((raw - low) / (high - low), 0.0, 1.0))
 
 
 def sharpness(mask_path):
-    """Spigolosita in 0..1."""
+    """Sharpness in 0..1."""
     return normalise("sharpness", sharpness_raw(mask_path))
 
 
 def brightness(image_path, mask_path):
-    """Luminosita in 0..1."""
+    """Brightness in 0..1."""
     return normalise("brightness", brightness_raw(image_path, mask_path))
 
 
 def body(mask_path):
-    """Corpo in 0..1."""
+    """Body in 0..1."""
     return normalise("body", body_raw(mask_path))
 
 
 def movement(image_path, mask_path):
-    """Movimento: three ingredients in 0..1, each driving its own part of the
+    """Movement: three ingredients in 0..1, each driving its own part of the
     sound, plus their mean (used only to place the object in the macro space)."""
     parts = {
         "asymmetry": normalise("asymmetry", asymmetry_raw(mask_path)),
@@ -326,20 +298,8 @@ def movement(image_path, mask_path):
     return parts
 
 
-def raw_values(image_path, mask_path):
-    """Every uncalibrated measurement, keyed like the calibration entries."""
-    return {
-        "sharpness": sharpness_raw(mask_path),
-        "brightness": brightness_raw(image_path, mask_path),
-        "body": body_raw(mask_path),
-        "asymmetry": asymmetry_raw(mask_path),
-        "texture": texture_raw(image_path, mask_path),
-        "colorfulness": colorfulness_raw(image_path, mask_path),
-    }
-
-
 def all_macros(image_path, mask_path):
-    """All macros (and Movimento's ingredients) in 0..1."""
+    """All macros (and Movement's ingredients) in 0..1."""
     values = {
         "sharpness": sharpness(mask_path),
         "brightness": brightness(image_path, mask_path),

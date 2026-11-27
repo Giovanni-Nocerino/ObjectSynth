@@ -36,13 +36,22 @@ def gated_linear(macro, at, start, end, below=0.0):
     return linear((macro - at) / (1.0 - at), start, end)
 
 
+def gated_ease_in(macro, at, start, end, below=0.0, power=2.0):
+    """`below` under the threshold, then from `start` (at `at`) to `end` (at 1),
+    slowly at first and faster near the top."""
+    if macro < at:
+        return below
+    return ease_in((macro - at) / (1.0 - at), start, end, power)
+
+
 def sharpness_parameters(s):
-    """Spigolosita: soft/round objects stay clean, sharp ones bite and distort."""
+    """Sharpness: soft/round objects stay clean, sharp ones bite and distort."""
     return {
-        # Distortion switches on early and drives hard: the synth's saturator gives
-        # ~3% THD at drive 3 and ~40% at drive 10, so the top of the range is needed.
-        "distortionEnabled": threshold(s, 0.15),
-        "distortionDrive": ease_out(s, 2.0, 10.0),
+        # Distortion only for clearly sharp objects, and it enters gently: drive 2
+        # at the threshold, rising slowly (squared) to 10 at the top (the
+        # saturator gives ~3% THD at drive 3 and ~40% at drive 10).
+        "distortionEnabled": threshold(s, DISTORTION_AT),
+        "distortionDrive": gated_ease_in(s, DISTORTION_AT, 2.0, 10.0, below=2.0),
         # Faster attack for sharper objects: 50 ms -> 2 ms.
         "attack": exponential(s, 0.050, 0.002),
         # A filter-envelope "pluck" at note start, stronger for sharper objects.
@@ -52,7 +61,7 @@ def sharpness_parameters(s):
 
 
 def brightness_parameters(b):
-    """Luminosita: dark objects sound muffled, bright objects open and airy."""
+    """Brightness: dark objects sound muffled, bright objects open and airy."""
     return {
         # Filter Bank (global tone): only the low-pass branch, opened by brightness.
         "filterBankEnabled": 1.0,
@@ -60,7 +69,7 @@ def brightness_parameters(b):
         "hpMix": 0.0,
         "bpMix": 0.0,
         "lpCutoff": exponential(b, 500.0, 18000.0),
-        # Voice filter: where each note settles after the Spigolosita "bite".
+        # Voice filter: where each note settles after the Sharpness "bite".
         "voiceFilterCutoff": exponential(b, 400.0, 4000.0),
     }
 
@@ -70,14 +79,15 @@ def stepped(macro, start, end):
     return float(round(start + (end - start) * macro))
 
 
-PLUCK_BELOW = 0.3  # Corpo under this: sustain 0, a pluck
+DISTORTION_AT = 0.4  # Sharpness from here: distortion on
+PLUCK_BELOW = 0.3  # Body under this: sustain 0, a pluck
 
 
 def body_parameters(c):
-    """Corpo: small objects sound thin and short, big ones thick, wide and long."""
+    """Body: small objects sound thin and short, big ones thick, wide and long."""
     return {
         # Unison: more oscillators spread wider in stereo (a bigger "ensemble").
-        # Their detune belongs to Movimento (asymmetry).
+        # Their detune belongs to Movement (asymmetry).
         "unisonEnabled": threshold(c, 0.2),
         "unisonCount": stepped(c, 1, 7),
         "unisonSpread": linear(c, 0.2, 1.0),
@@ -98,7 +108,7 @@ LFO_SINE = 0
 
 
 def movement_parameters(asymmetry, texture, colorfulness):
-    """Movimento: each ingredient moves its own part of the sound."""
+    """Movement: each ingredient moves its own part of the sound."""
     step = LFO_SYNC_STEPS[min(int(texture * len(LFO_SYNC_STEPS)), len(LFO_SYNC_STEPS) - 1)]
     return {
         # Asymmetry -> detune: a lopsided object gives out-of-tune, beating voices.

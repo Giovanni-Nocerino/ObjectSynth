@@ -28,7 +28,7 @@ class PipelineStopped(Exception):
 def ask_object_name(capture_stem):
     """Optional human name for the preset; Enter keeps the capture's file name."""
     try:
-        name = input("Nome dell'oggetto per il preset (Invio = nome della foto): ")
+        name = input("Object name for the preset (Enter = photo name): ")
     except EOFError:
         name = ""
     return set_object_name(capture_stem, name)
@@ -51,7 +51,7 @@ def run():
         raise RuntimeError(f"Wavetable export failed: {error}") from error
 
     # ObjectSynth preset: same wavetable + parameters from the four macros,
-    # normalised with the stored calibration (macro_calibration.json).
+    # mapped to 0..1 with macros.MACRO_RANGES.
     try:
         image_path, mask_path = Path(image_path), Path(mask_path)
         ask_object_name(image_path.stem)
@@ -60,8 +60,8 @@ def run():
         raise RuntimeError(f"Preset export failed: {error}") from error
 
     print(f"ObjectSynth preset saved to: {preset_path}")
-    print(f"Spigolosita {values['sharpness']:.2f} | Luminosita {values['brightness']:.2f} | "
-          f"Corpo {values['body']:.2f} | Movimento {values['movement']:.2f}")
+    print(f"Sharpness {values['sharpness']:.2f} | Brightness {values['brightness']:.2f} | "
+          f"Body {values['body']:.2f} | Movement {values['movement']:.2f}")
     return preset_path
 
 

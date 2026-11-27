@@ -2,7 +2,7 @@
 
 For every capture with a SAM mask:
   1. build the 32-frame wavetable (same features as the Serum export),
-  2. measure the macros (Spigolosita, Luminosita, Corpo, Movimento),
+  2. measure the macros (sharpness, brightness, body, movement),
   3. map the macros to synth parameters,
   4. write presets/<object>.ospreset with wavetable + parameters embedded
      (object names come from object_names.json; unnamed captures keep their file name).
@@ -10,7 +10,7 @@ For every capture with a SAM mask:
 Usage:
   python make_presets.py
 
-The macros are normalised with macro_calibration.json (see calibrate_dis5k.py).
+The macros are mapped to 0..1 with the fixed ranges in macros.MACRO_RANGES.
 """
 
 import json
@@ -146,10 +146,10 @@ def main():
         except (ValueError, OSError) as error:
             print(f"{image_path.stem}: skipped ({error})")
             continue
-        print(f"{path.name}: spigolosita={values['sharpness']:.2f} "
-              f"luminosita={values['brightness']:.2f} corpo={values['body']:.2f} "
-              f"movimento={values['movement']:.2f} (asimmetria={values['asymmetry']:.2f} "
-              f"texture={values['texture']:.2f} colore={values['colorfulness']:.2f})")
+        print(f"{path.name}: sharpness={values['sharpness']:.2f} "
+              f"brightness={values['brightness']:.2f} body={values['body']:.2f} "
+              f"movement={values['movement']:.2f} (asymmetry={values['asymmetry']:.2f} "
+              f"texture={values['texture']:.2f} colorfulness={values['colorfulness']:.2f})")
 
 
 if __name__ == "__main__":
