@@ -5,6 +5,8 @@ Photograph an object, turn its shape into a wavetable synth sound.
 - `CV/`: the camera pipeline (camera -> SAM mask -> wavetable + macros -> `.ospreset`).
 - `ObjectSynth/`: the JUCE wavetable synth (VST3 + Standalone) that plays the presets
   and has a **FROM CAMERA** button that runs the pipeline.
+- `docs/macro-map.html`: an interactive page that shows how it all works, with
+  animations, knobs and sound (see [Explorer page](#explorer-page)).
 
 The camera button opens the pipeline in a terminal window: Terminal on macOS,
 a command prompt on Windows, your terminal emulator on Linux (`$TERMINAL`, or the
@@ -106,24 +108,39 @@ and open the preset with **OPEN PRESET**.
 
 ## Explorer page
 
-`docs/macro-map.html` explains the pipeline in three tabs; open it in any browser:
-- **Wavetable conversion** animates, step by step as you scroll, how a photo becomes the
-  wavetable: the columns collapsing into a curve and its 64 harmonics, and the rings of the
-  2D spectrum. A slider plays the 32 frames.
-- **Macro implementation** shows how each macro is measured and which synth parameters it turns.
+`docs/macro-map.html` is a visual explanation of the project, in three tabs. Pick an
+object from the **Object** menu at the top and every tab follows it:
+- **Wavetable conversion** animates, step by step as you scroll inside each panel, how a
+  photo becomes the wavetable: the columns collapsing into a curve and its 64 harmonics,
+  and the rings of the 2D spectrum. A slider plays the 32 frames.
+- **Macro implementation** shows how each macro is measured and which synth parameters it
+  turns, with knobs you can move.
 - **Effects** plays the object's wavetable through the synth's chain (same algorithms and
   parameters, rebuilt with Web Audio) with the settings its macros chose, and shows each
   module on an oscilloscope, a spectrum, a stereo field and an envelope trace.
 
-Its **TRY YOUR OWN!** lens runs your own photo through the same SAM, wavetable and macro
-code as the pipeline, and updates every tab. It needs a small local server:
+There are two ways to open it.
+
+**Just the page (no setup).** Open `docs/macro-map.html` in any browser, e.g. by
+double-clicking it. Everything works with the 29 example objects (photos from the
+dataset, already inside the page): animations, knobs and sound. Only **TRY YOUR OWN!**
+needs the server below; without it, the lens shows the command to start it.
+
+**With the server (your own photos and the camera).** The **TRY YOUR OWN!** lens (top
+right) runs your photo through the same SAM, wavetable and macro code as the pipeline.
+It needs the Python environment from step 1 and a small local server. From the
+repository folder:
 
 ```bash
 .venv/bin/python CV/macro_server.py
 ```
 
-Then open <http://127.0.0.1:8765> (the camera works there in every browser), press the
-lens, upload a photo or take one, click the object and press **Measure macros**.
+On Windows: `.venv\Scripts\python CV\macro_server.py`. Then open
+<http://127.0.0.1:8765> (open it from this address rather than from the file: browsers
+only allow the camera on a page served like this). Press the lens, upload a photo or
+take one, click the object (right-click or **− Background** to exclude parts) and press
+**Measure macros**: "★ your object" appears in the Object menu and in every tab. The
+first photo takes a few seconds while SAM loads. Stop the server with Ctrl+C.
 
 ## Troubleshooting
 
