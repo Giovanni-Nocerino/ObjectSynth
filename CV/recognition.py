@@ -11,7 +11,7 @@ CV_DIRECTORY = Path(__file__).resolve().parent
 CAPTURE_DIRECTORY = CV_DIRECTORY / "captures"
 MASK_DIRECTORY = CV_DIRECTORY / "masks"
 MODEL_PATH = CV_DIRECTORY / "models" / "sam2.1_b.pt"
-WINDOW_NAME = "PlayAnyThing - Select object"
+WINDOW_NAME = "ObjectSynth - Select object"
 MAX_WINDOW_WIDTH = 1100
 MAX_WINDOW_HEIGHT = 750
 

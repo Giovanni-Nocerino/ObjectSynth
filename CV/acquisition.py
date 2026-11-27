@@ -8,7 +8,7 @@ import cv2
 
 CAMERA_INDEX = 0
 CAPTURE_DIRECTORY = Path(__file__).resolve().parent / "captures"
-WINDOW_NAME = "PlayAnyThing - Camera"
+WINDOW_NAME = "ObjectSynth - Camera"
 
 
 def capture_image():

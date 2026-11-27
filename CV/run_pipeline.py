@@ -80,7 +80,7 @@ def write_result(result_file, status, detail):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="PlayAnyThing camera pipeline.")
+    parser = argparse.ArgumentParser(description="ObjectSynth camera pipeline.")
     parser.add_argument("--result-file", type=Path,
                         help="Write OK/ERROR/CANCELLED and the preset path here.")
     args = parser.parse_args()

@@ -22,7 +22,7 @@ so create it exactly there. Use Python 3.12.
 macOS / Linux:
 
 ```bash
-cd PlayAnyThingVST
+cd ObjectSynth
 python3.12 -m venv .venv
 .venv/bin/pip install -r CV/requirements.txt
 ```
@@ -39,7 +39,7 @@ libraries that are of no use there.
 Windows (PowerShell):
 
 ```powershell
-cd PlayAnyThingVST
+cd ObjectSynth
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r CV\requirements.txt
 ```
