@@ -1,12 +1,15 @@
-"""Embed the example objects' photos in docs/macro-map.html (the Polaroid).
+"""Embed the example objects in docs/macro-map.html.
 
 For each object of the page's OBJECTS list, finds the dataset photo its
 preset was made from (same pick as dataset-presets/make_dataset_presets.py),
-checks that its macros match the page, and stores a small thumbnail made
-like the presets' own (CV/make_presets.object_photo).
+checks that its macros match the page, and stores:
+  - a small thumbnail made like the presets' own (CV/make_presets.object_photo),
+    for the Polaroid;
+  - the wavetable steps (CV/wavetable_story.story_data), for the
+    Wavetable conversion tab.
 
 Run from the repository root:
-  .venv/bin/python CV/page_photos.py
+  .venv/bin/python CV/page_objects.py
 """
 
 import base64
@@ -23,7 +26,8 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT / "dataset-presets"))
 
 import macros  # noqa: E402
-from make_dataset_presets import DEFAULT_PHOTOS, SEED, photo_pairs, tag_name  # noqa: E402
+import wavetable_story  # noqa: E402
+from make_dataset_presets import DEFAULT_PHOTOS, RENAME, SEED, photo_pairs, tag_name  # noqa: E402
 from make_presets import object_photo  # noqa: E402
 
 PAGE = ROOT / "docs" / "macro-map.html"
@@ -43,7 +47,7 @@ def dataset_pick():
     for name in names:
         candidates = by_name[name]
         rng.shuffle(candidates)
-        picks[name] = candidates
+        picks[RENAME.get(name, name)] = candidates
     return picks
 
 
@@ -64,6 +68,7 @@ def main():
     picks = dataset_pick()
     # objects that are not dataset photos keep the photo already in the page
     photos = json.loads(re.search(r'<script id="objectPhotos" type="application/json">(.*?)</script>', html, re.S).group(1))
+    wavetables = {}
     for entry in objects:
         name = entry["name"]
         for photo, mask in picks.get(name, []):
@@ -75,16 +80,18 @@ def main():
             if off > 0.002:
                 print(f"{name}: {photo.name} does not match the page (off by {off:.3f})")
             photos[name] = thumbnail(photo, mask)
+            wavetables[name] = wavetable_story.story_data(photo, mask, name)
             break
         else:
             print(f"{name}: no dataset photo, " + ("kept the page's photo" if name in photos else "no photo"))
-    block = f'<script id="objectPhotos" type="application/json">{json.dumps(photos, separators=(",", ":"))}</script>'
-    html, count = re.subn(r'<script id="objectPhotos" type="application/json">.*?</script>',
-                          lambda _: block, html, flags=re.S)
-    if count != 1:
-        sys.exit(f"No objectPhotos block in {PAGE}")
+    for block_id, data in (("objectPhotos", photos), ("objectWavetables", wavetables)):
+        block = f'<script id="{block_id}" type="application/json">{json.dumps(data, separators=(",", ":"))}</script>'
+        html, count = re.subn(rf'<script id="{block_id}" type="application/json">.*?</script>',
+                              lambda _: block, html, flags=re.S)
+        if count != 1:
+            sys.exit(f"No {block_id} block in {PAGE}")
     PAGE.write_text(html)
-    print(f"{len(photos)} photos embedded in {PAGE}")
+    print(f"{len(photos)} photos and {len(wavetables)} wavetables embedded in {PAGE}")
 
 
 if __name__ == "__main__":

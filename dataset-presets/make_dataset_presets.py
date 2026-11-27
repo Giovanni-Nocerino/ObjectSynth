@@ -31,6 +31,10 @@ from ospreset import write_preset  # noqa: E402
 
 DEFAULT_PHOTOS = HERE.parent / "CV" / "datasets" / "dis5k-1920"
 SEED = 7
+# Tags renamed to a plainer word, and objects left out. Both are applied after the
+# random pick, so the other presets stay the same photos.
+RENAME = {"FerrisWheel": "ObservationWheel"}
+SKIP = {"UnevenBars"}
 
 
 def tag_name(stem):
@@ -83,9 +87,12 @@ def main():
             break
         candidates = by_name[name]
         rng.shuffle(candidates)
+        if name in SKIP:   # counted, so the set of other objects does not change
+            made += 1
+            continue
         for photo, mask in candidates:  # next photo of the same object if one fails
             try:
-                values = make_preset(photo, mask, name)
+                values = make_preset(photo, mask, RENAME.get(name, name))
             except (ValueError, OSError) as error:
                 print(f"{name}: {photo.name} skipped ({error})")
                 continue

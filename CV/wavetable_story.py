@@ -7,16 +7,11 @@ adds small pictures of each step, so the page can animate them:
   - the object fitted into the FFT square, its 2D power spectrum and the
     64 ring averages before and after the log compression.
 
-macro_server.py sends this for "Try your own!" photos. Run this file to
-refresh the example embedded in the page (from the repository root):
-  .venv/bin/python CV/wavetable_story.py <photo> <mask>
+macro_server.py sends this for "Try your own!" photos; CV/page_objects.py
+embeds it in the page for every example object.
 """
 
-import argparse
 import base64
-import json
-import re
-from pathlib import Path
 
 import cv2
 import numpy as np
@@ -25,7 +20,7 @@ import waveforom_extraction as extraction
 
 GRID_COLUMNS = 64        # columns of the pixel grid that "falls" into the vector
 SQUARE_CELLS = 64        # cells per side of the coloured FFT square
-PAGE_PATH = Path(__file__).resolve().parent.parent / "docs" / "macro-map.html"
+SPECTRUM_SIZE = 128      # the 256 x 256 spectrum is shown at this size (smaller page)
 
 
 def to_base64(array):
@@ -85,6 +80,7 @@ def story_data(image_path, mask_path, name):
     power, rings = ring_powers(square)
     spectrum = np.log1p(power)
     spectrum = (spectrum - spectrum.min()) / max(spectrum.max() - spectrum.min(), 1e-9)
+    spectrum = shrink(spectrum.astype(np.float32), SPECTRUM_SIZE, SPECTRUM_SIZE)
 
     return {
         "name": name,
@@ -95,40 +91,16 @@ def story_data(image_path, mask_path, name):
             "colour": to_base64(grid_colour),
             "mask": to_base64(grid_mask * 255),
         },
-        "rawProfile": np.round(raw_profile, 5).tolist(),
-        "profile": np.round(profile, 5).tolist(),
+        "rawProfile": np.round(raw_profile, 4).tolist(),
+        "profile": np.round(profile, 4).tolist(),
         "coefficients": np.round(coefficients, 6).tolist(),
         "square": {
             "cells": SQUARE_CELLS,
             "colour": to_base64(shrink(colour_square.astype(np.float32), SQUARE_CELLS, SQUARE_CELLS)),
             "luminance": to_base64(shrink(square.astype(np.float32), SQUARE_CELLS, SQUARE_CELLS) * 255),
         },
-        "spectrum": {"size": extraction.FFT_IMAGE_SIZE, "pixels": to_base64(spectrum ** 1.4 * 255)},
+        "spectrum": {"size": SPECTRUM_SIZE, "pixels": to_base64(spectrum ** 1.4 * 255)},
         "ringPowers": np.round(rings / max(rings.max(), 1e-12), 6).tolist(),
         "texture": np.round(extraction.radial_fft_amplitudes(luminance), 6).tolist(),
     }
 
-
-def embed(data, page=PAGE_PATH):
-    """Replace the example inside <script id="wavetableExample"> in the page."""
-    html = page.read_text()
-    block = f'<script id="wavetableExample" type="application/json">{json.dumps(data, separators=(",", ":"))}</script>'
-    html, count = re.subn(r'<script id="wavetableExample" type="application/json">.*?</script>',
-                          lambda _: block, html, flags=re.S)
-    if count != 1:
-        raise SystemExit(f"No wavetableExample block in {page}")
-    page.write_text(html)
-
-
-def main():
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("image")
-    parser.add_argument("mask")
-    parser.add_argument("--name", default="Teapot")
-    args = parser.parse_args()
-    embed(story_data(args.image, args.mask, args.name))
-    print(f"Example '{args.name}' embedded in {PAGE_PATH}")
-
-
-if __name__ == "__main__":
-    main()
