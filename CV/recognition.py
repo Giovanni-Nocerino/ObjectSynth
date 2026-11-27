@@ -108,10 +108,23 @@ def handle_mouse_click(event, x, y, flags, state):
     state["new_prompt"] = True
 
 
+MODEL_URL = "https://github.com/ultralytics/assets/releases/download/v8.4.0/sam2.1_b.pt"
+
+
 def load_model():
-    """The SAM model (downloaded to MODEL_PATH the first time)."""
-    print(f"Loading SAM model: {MODEL_PATH}")
-    return SAM(str(MODEL_PATH))
+    """The SAM model. It is not in git (too big): Ultralytics downloads it to
+    MODEL_PATH the first time, which needs an internet connection once."""
+    if not MODEL_PATH.is_file():
+        print(f"SAM model not found: downloading it (about 160 MB) to {MODEL_PATH}")
+    else:
+        print(f"Loading SAM model: {MODEL_PATH}")
+    try:
+        return SAM(str(MODEL_PATH))
+    except Exception as error:
+        raise RuntimeError(
+            f"Could not load the SAM model ({error}). Connect to the internet and try "
+            f"again, or download {MODEL_URL} and save it as {MODEL_PATH}."
+        ) from error
 
 
 def segment(model, image, points, labels):
