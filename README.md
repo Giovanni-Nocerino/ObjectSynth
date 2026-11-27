@@ -5,7 +5,7 @@ Photograph an object, turn its shape into a wavetable synth sound.
 - `CV/`: the camera pipeline (camera -> SAM mask -> wavetable + macros -> `.ospreset`).
 - `ObjectSynth/`: the JUCE wavetable synth (VST3 + Standalone) that plays the presets
   and has a **FROM CAMERA** button that runs the pipeline.
-- `docs/macro-map.html`: an interactive page that shows how it all works, with
+- `docs/explorer.html`: an interactive page that shows how it all works, with
   animations, knobs and sound (see [Explorer page](#explorer-page)).
 
 The camera button opens the pipeline in a terminal window: Terminal on macOS,
@@ -132,7 +132,7 @@ and open the preset with **OPEN PRESET**.
 
 ## Explorer page
 
-`docs/macro-map.html` is a visual explanation of the project, in three tabs. Pick an
+`docs/explorer.html` is a visual explanation of the project, in three tabs. Pick an
 object from the **Object** menu at the top and every tab follows it:
 - **Wavetable conversion** animates, step by step as you scroll inside each panel, how a
   photo becomes the wavetable: the columns collapsing into a curve and its 64 harmonics,
@@ -145,7 +145,7 @@ object from the **Object** menu at the top and every tab follows it:
 
 There are two ways to open it.
 
-**Just the page (no setup).** Open `docs/macro-map.html` in any browser, e.g. by
+**Just the page (no setup).** Open `docs/explorer.html` in any browser, e.g. by
 double-clicking it. Everything works with the 29 example objects (photos from the
 dataset, already inside the page): animations, knobs and sound. Only **TRY YOUR OWN!**
 needs the server below; without it, the lens shows the command to start it.

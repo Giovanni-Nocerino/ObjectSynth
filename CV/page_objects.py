@@ -1,4 +1,4 @@
-"""Embed the example objects in docs/macro-map.html.
+"""Embed the example objects in docs/explorer.html.
 
 For each object of the page's OBJECTS list, finds the dataset photo its
 preset was made from (same pick as dataset-presets/make_dataset_presets.py),
@@ -30,7 +30,7 @@ import wavetable_story  # noqa: E402
 from make_dataset_presets import DEFAULT_PHOTOS, RENAME, SEED, photo_pairs, tag_name  # noqa: E402
 from make_presets import object_photo  # noqa: E402
 
-PAGE = ROOT / "docs" / "macro-map.html"
+PAGE = ROOT / "docs" / "explorer.html"
 THUMB_SIDE = 260
 THUMB_QUALITY = 74
 

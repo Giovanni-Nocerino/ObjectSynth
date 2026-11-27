@@ -1,4 +1,4 @@
-"""Local server for the "Try your own!" lens in docs/macro-map.html.
+"""Local server for the "Try your own!" lens in docs/explorer.html.
 
 The page sends a photo and the clicked points; this runs the same code as the
 camera pipeline (recognition.segment for the SAM mask, macros.all_macros for
@@ -7,10 +7,10 @@ the macros) and sends the results back. It listens on 127.0.0.1 only.
 Usage (from the repository root):
   .venv/bin/python CV/macro_server.py [--port 8765]
 then open http://127.0.0.1:8765 (the page is served from here, so the
-browser allows the camera), or open docs/macro-map.html from disk.
+browser allows the camera), or open docs/explorer.html from disk.
 
 Endpoints (JSON in, JSON out):
-  GET  /                                         -> docs/macro-map.html
+  GET  /                                         -> docs/explorer.html
   GET  /health                                   -> {"ok": true}
   POST /photo   {"image": <data URL>}            -> {"id", "width", "height"}
   POST /segment {"id", "points", "labels"}       -> {"mask": <PNG data URL>}
@@ -35,7 +35,7 @@ import macros
 import wavetable_story
 from recognition import load_model, segment
 
-PAGE_PATH = macros.CV_DIRECTORY.parent / "docs" / "macro-map.html"
+PAGE_PATH = macros.CV_DIRECTORY.parent / "docs" / "explorer.html"
 PHOTO_LONG_SIDE = 1920  # the camera captures are 1920 x 1080
 MAX_PHOTOS = 8          # photos kept in memory (oldest dropped)
 
@@ -177,7 +177,7 @@ def main():
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     server = HTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Macro map on http://127.0.0.1:{args.port} - open it and press TRY YOUR OWN!")
+    print(f"ObjectSynth Explorer on http://127.0.0.1:{args.port} - open it and press TRY YOUR OWN!")
     print("Ctrl+C to stop.")
     try:
         server.serve_forever()

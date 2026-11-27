@@ -1,4 +1,4 @@
-"""Data for the "Wavetable conversion" tab of docs/macro-map.html.
+"""Data for the "Wavetable conversion" tab of docs/explorer.html.
 
 Runs the real wavetable code (waveforom_extraction.py) on one photo + mask and
 adds small pictures of each step, so the page can animate them:
