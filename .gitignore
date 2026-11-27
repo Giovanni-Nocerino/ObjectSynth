@@ -11,3 +11,7 @@
 *.zip
 
 CV/datasets/
+
+# Camera presets and their names stay on each computer
+CV/presets/
+CV/object_names.json
