@@ -9,6 +9,7 @@
 \setlength{\parskip}{0.25em}
 \setlength{\parindent}{0pt}
 \usepackage{graphicx}
+\usepackage{float}
 \usepackage[font=small,labelfont=bf]{caption}
 \title{\vspace{-2.4em}\textbf{ObjectSynth} --- What Does This Object Sound Like?}
 \author{Giovanni Nocerino \and Giacomo Cordella}
@@ -30,15 +31,6 @@ Once SAM 2.1 hands us a clean binary mask of the main object in view, we had to 
 
 \textbf{Effect Application.} OS has many parameters, and wiring image extracted features to each one of them, keeping a reasonable relation between look and sound, was not the right path. Instead, we measure six visual traits anyone can spot at a glance: sharpness (Harris corner detector), brightness (CIELAB lightness), body (share of the frame), asymmetry (overlap with a mirrored version), texture (Canny edge detector), and colourfulness (CIELAB chroma). Each trait nudges a small cluster of musically related controls with different scaling (Figure~\ref{fig:macro}). Sharp edges bite and attack fast, bright objects open up, big ones stretch wide and long, and colourful ones shimmer. A nice visualization is documented in \texttt{docs/explorer.html} inside the repository.
 
-\begin{figure}[h]
-  \centering
-  \includegraphics[width=\linewidth]{figures/macro.png}
-  \vspace{-1.4em}
-  \caption{An example of how a macro works: the Harris corner response sets the sharpness, which turns distortion, drive, attack and the filter envelope.}
-  \label{fig:macro}
-  \vspace{-0.8em}
-\end{figure}
-
 \section*{Synth Programming}
 The synth plays up to eight notes at once and is written from scratch on top of JUCE.
 Each note repeats the object's waveform at the pitch of the key, can be thickened by
@@ -46,8 +38,8 @@ detuned copies of itself, and has its own envelope and filter, so it can start w
 ``pluck'' and fade like a real instrument. The notes are then summed and share a tone
 filter, a distortion and a chorus.
 
-\textbf{Per note or on the mix?} One question decided where each module lives: does it
-depend on each note's own timing, or on how the notes combine? Envelopes start with each
+\textbf{Per note or on the mix.} Where each module lives depends on whether it follows
+each note's own timing or how the notes combine. Envelopes start with each
 note, so they stay per note; a plain filter treats a sum like its parts, so it runs once
 on the mix, at an eighth of the cost. Distortion is the interesting case: on the mix the
 notes of a chord interact like through a guitar amplifier, which is the sound we wanted.
@@ -77,6 +69,16 @@ sudden jump is heard as a click.
 \textbf{The Nyquist Frequency.} Early prototypes overlooked a classic digital audio trap: frequencies above half the sample rate cannot be represented cleanly. High notes started sounding rough and slightly out of tune; checking the pitch revealed upper harmonics crossing Nyquist and folding back as aliasing. Now each waveform stores band-limited versions with fewer harmonics, and every voice plays the version that is safe for its pitch.
 
 \textbf{Limitations.} Mapping pixels to sound will always be a creative design choice rather than ground truth---two sound designers would wire the same object differently. Lighting, cluttered backgrounds, and mask accuracy also still affect the result more than we would like.
+
+
+\begin{figure}[H]
+  \centering
+  \includegraphics[width=\linewidth]{figures/macro.png}
+  \vspace{-1.4em}
+  \caption{An example of how a macro works: the Harris corner response sets the sharpness, which turns distortion, drive, attack and the filter envelope.}
+  \label{fig:macro}
+  \vspace{-0.8em}
+\end{figure}
 
 \vspace{0.2em}
 {\small [1] A.~Kirillov et al. \emph{Segment Anything}. arXiv:2304.02643, 2023. \url{https://arxiv.org/abs/2304.02643}}
