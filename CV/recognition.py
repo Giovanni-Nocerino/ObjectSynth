@@ -108,6 +108,37 @@ def handle_mouse_click(event, x, y, flags, state):
     state["new_prompt"] = True
 
 
+def load_model():
+    """The SAM model (downloaded to MODEL_PATH the first time)."""
+    print(f"Loading SAM model: {MODEL_PATH}")
+    return SAM(str(MODEL_PATH))
+
+
+def segment(model, image, points, labels):
+    """Object mask (uint8, 0 or 255, image size) for the clicked points, or None.
+
+    points: [[x, y], ...] in image pixels; labels: 1 = object, 0 = background.
+    """
+    # One extra level of nesting = all clicks are ONE prompt for one object.
+    # A flat list would make Ultralytics treat every click as a separate
+    # object, so the - points would never carve the mask.
+    results = model.predict(source=image, points=[points], labels=[labels], verbose=False)
+    result = results[0]
+    if result.masks is None or len(result.masks.data) == 0:
+        return None
+
+    mask_index = 0
+    if result.boxes is not None and len(result.boxes.conf) == len(result.masks.data):
+        mask_index = int(result.boxes.conf.argmax().item())
+
+    mask = result.masks.data[mask_index].cpu().numpy()
+    image_height, image_width = image.shape[:2]
+    if mask.shape != (image_height, image_width):
+        mask = cv2.resize(mask.astype("uint8"), (image_width, image_height),
+                          interpolation=cv2.INTER_NEAREST)
+    return (mask > 0).astype("uint8") * 255
+
+
 def run_sam(image, image_path):
     """Run SAM with the points selected by the user."""
     state = {"points": [], "labels": [], "new_prompt": False}
@@ -160,37 +191,13 @@ def run_sam(image, image_path):
                     continue
 
                 if model is None:
-                    print(f"Loading SAM model: {MODEL_PATH}")
-                    model = SAM(str(MODEL_PATH))
+                    model = load_model()
 
                 print("Segmenting image...")
-                # One extra level of nesting = all clicks are ONE prompt for one
-                # object. A flat list would make Ultralytics treat every click as
-                # a separate object, so the - points would never carve the mask.
-                results = model.predict(
-                    source=image,
-                    points=[state["points"]],
-                    labels=[state["labels"]],
-                    verbose=False,
-                )
-                result = results[0]
-
-                if result.masks is None or len(result.masks.data) == 0:
+                mask = segment(model, image, state["points"], state["labels"])
+                if mask is None:
                     print("SAM did not return a mask. Try different points.")
                     continue
-
-                mask_index = 0
-                if result.boxes is not None and len(result.boxes.conf) == len(result.masks.data):
-                    mask_index = int(result.boxes.conf.argmax().item())
-
-                mask = result.masks.data[mask_index].cpu().numpy()
-                if mask.shape != image.shape[:2]:
-                    mask = cv2.resize(
-                        mask.astype("uint8"),
-                        (image_width, image_height),
-                        interpolation=cv2.INTER_NEAREST,
-                    )
-                mask = (mask > 0).astype("uint8") * 255
                 print("Mask ready. Add more points and press Enter to refine, S to save, or Q to quit.")
             elif key == ord("s") and mask is not None:
                 MASK_DIRECTORY.mkdir(parents=True, exist_ok=True)

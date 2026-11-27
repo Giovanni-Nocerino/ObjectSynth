@@ -1,0 +1,1002 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ObjectSynth Macro Map</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+/* Layout: one camera-body page; every macro is a metal plate read left to right:
+   measurement -> macro knob -> the synth parameters it turns. Single dark look
+   on purpose (the plugin's own camera body). */
+:root {
+  color-scheme: dark;
+  --body: #1e2023;        /* leatherette */
+  --plate: #2b2d31;       /* top plates */
+  --plate-hi: #34363b;
+  --edge: #44474c;
+  --glass: #0c0d0f;       /* LCD / gloss black */
+  --ink: #ecebe7;
+  --muted: #a0a4aa;
+  --dim: #60646b;
+  --red: #e2261e;         /* index mark, sparingly */
+  --lcd: #c9b8ff;         /* violet-tinted LCD digits */
+  --c-sharpness: #ff6a52;
+  --c-brightness: #efe6c8;
+  --c-body: #70d6a2;
+  --c-movement: #a888f5;
+  --display: "Barlow Condensed", "Arial Narrow", "Helvetica Neue", sans-serif;
+  --text: "IBM Plex Sans", "Helvetica Neue", Arial, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, Consolas, monospace;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0;
+  background: var(--body);
+  background-image:
+    radial-gradient(rgba(255,255,255,0.035) 1px, transparent 1.2px),
+    radial-gradient(rgba(0,0,0,0.35) 1px, transparent 1.2px);
+  background-size: 5px 5px, 7px 7px;
+  background-position: 0 0, 2px 3px;
+  color: var(--ink);
+  font-family: var(--text);
+  font-size: 15px;
+  line-height: 1.5;
+}
+.wrap {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding-block: 36px 72px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid;
+  gap: 28px;
+}
+
+/* ---------- header ---------- */
+.brand { display: flex; align-items: center; gap: 10px; font-family: var(--display); font-weight: 700;
+  letter-spacing: 0.16em; font-size: 15px; color: var(--muted); }
+.brand i { width: 10px; height: 10px; border-radius: 50%; background: var(--red);
+  box-shadow: 0 0 0 3px rgba(226,38,30,0.22); }
+h1 { font-family: var(--display); font-weight: 600; font-size: clamp(40px, 6vw, 64px);
+  line-height: 0.95; letter-spacing: 0.02em; margin: 8px 0 0; text-transform: uppercase; text-wrap: balance; }
+.lede { max-width: 66ch; color: var(--muted); margin: 12px 0 0; }
+.chain { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; margin-top: 16px;
+  font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.chain span { padding: 3px 8px; border: 1px solid var(--edge); border-radius: 4px; background: rgba(0,0,0,0.2); }
+.chain b { color: var(--dim); font-weight: 400; }
+
+/* ---------- object picker ---------- */
+.picker { display: grid; gap: 10px; }
+.eyebrow { font-family: var(--display); font-weight: 600; font-size: 13px; letter-spacing: 0.16em;
+  text-transform: uppercase; color: var(--muted); }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 13px/1 var(--text); color: var(--ink); background: var(--plate);
+  border: 1px solid var(--edge); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.chip:hover { background: var(--plate-hi); }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--glass); border-color: var(--ink); }
+.chip:focus-visible, .knob:focus-visible { outline: 2px solid var(--lcd); outline-offset: 3px; }
+
+/* ---------- macro plates ---------- */
+.plate {
+  background: linear-gradient(180deg, var(--plate-hi), var(--plate) 40%);
+  border: 1px solid #000;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.07), 0 10px 24px rgba(0,0,0,0.35);
+  border-radius: 10px;
+  padding: 22px;
+  display: grid;
+  gap: 18px;
+}
+.plate-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+.plate-head h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 30px;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent); }
+.plate-head p { margin: 0; color: var(--muted); max-width: 70ch; }
+.mean { margin-left: auto; display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--muted); }
+
+.row { position: relative; display: grid; gap: 56px;
+  grid-template-columns: minmax(220px, 1fr) 200px minmax(0, 2.3fr); align-items: center; }
+.row + .row { border-top: 1px solid rgba(0,0,0,0.45); box-shadow: 0 -1px 0 rgba(255,255,255,0.04); padding-top: 22px; }
+.links { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; overflow: visible; }
+.links path { fill: none; stroke-width: 1.6; transition: stroke 0.25s, opacity 0.25s; }
+.links path.on { stroke: var(--accent); opacity: 0.85; }
+.links path.off { stroke: var(--dim); opacity: 0.6; stroke-dasharray: 3 4; }
+
+/* measurement card */
+.algo { position: relative; z-index: 1; background: rgba(0,0,0,0.22); border: 1px solid rgba(0,0,0,0.5);
+  border-radius: 8px; padding: 14px 16px; display: grid; gap: 8px; min-width: 0; }
+.algo h3 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 21px; letter-spacing: 0.03em; line-height: 1.1; }
+.algo .cite { font-size: 12px; color: var(--muted); font-style: italic; }
+.algo p { margin: 0; font-size: 13.5px; color: #cfd0cf; }
+.algo .input { font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+.rawbar { display: grid; gap: 4px; }
+.rawbar .track { position: relative; height: 6px; border-radius: 3px; background: var(--glass);
+  box-shadow: inset 0 1px 2px #000; }
+.rawbar .fill { position: absolute; inset: 0 auto 0 0; border-radius: 3px; background: var(--accent); opacity: 0.75; }
+.rawbar .ends { display: flex; justify-content: space-between; font-family: var(--mono); font-size: 11px; color: var(--dim);
+  font-variant-numeric: tabular-nums; }
+
+/* LCD readout */
+.lcd { display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 9px; border-radius: 4px;
+  background: linear-gradient(180deg, #050607, #101116); box-shadow: inset 0 1px 3px #000, 0 1px 0 rgba(255,255,255,0.06);
+  font-family: var(--mono); font-weight: 500; font-size: 14px; color: var(--lcd); font-variant-numeric: tabular-nums;
+  white-space: nowrap; }
+.lcd small { font-size: 10.5px; color: #8a80aa; font-weight: 400; }
+
+/* macro knob column */
+.macro { position: relative; z-index: 1; display: grid; justify-items: center; gap: 8px; }
+.knob { width: 180px; height: 180px; cursor: ns-resize; touch-action: none; border-radius: 50%; }
+.knob svg { width: 100%; height: 100%; display: block; overflow: visible; }
+.macro .name { font-family: var(--display); font-weight: 700; font-size: 20px; letter-spacing: 0.2em;
+  text-transform: uppercase; }
+.hint { font-size: 11.5px; color: var(--dim); }
+
+/* dependents */
+.deps { position: relative; z-index: 1; display: grid; gap: 12px; min-width: 0;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr)); }
+.dep { background: linear-gradient(180deg, #26282c, #212327); border: 1px solid rgba(0,0,0,0.6);
+  border-radius: 8px; padding: 10px 12px 11px; display: grid; gap: 6px; min-width: 0;
+  transition: opacity 0.25s; }
+.dep.idle { opacity: 0.5; }
+.dep .top { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; }
+.dep .label { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.06em;
+  text-transform: uppercase; line-height: 1.1; }
+.dep .module { font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim); white-space: nowrap; }
+.dep .mid { display: flex; align-items: center; gap: 10px; min-height: 58px; }
+.dep .mini { width: 56px; height: 56px; flex: none; }
+.dep .rel { font-size: 12px; color: var(--muted); line-height: 1.35; }
+.dep .state { font-size: 11px; color: var(--dim); min-height: 1.2em; }
+.curve { width: 100%; height: 42px; display: block; }
+
+/* switch LED */
+.led { width: 56px; height: 56px; flex: none; display: grid; place-items: center; }
+.led .cap { width: 34px; height: 34px; border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #3a3d42, #121316 70%); box-shadow: 0 2px 4px #000, inset 0 1px 0 rgba(255,255,255,0.1);
+  display: grid; place-items: center; }
+.led .dot { width: 12px; height: 12px; border-radius: 50%; background: #2a1c1b; box-shadow: inset 0 1px 2px #000; transition: background 0.2s, box-shadow 0.2s; }
+.led.on .dot { background: var(--red); box-shadow: 0 0 10px rgba(226,38,30,0.8), inset 0 -1px 2px rgba(0,0,0,0.4); }
+
+/* stepped dial */
+.steps { display: flex; flex-wrap: wrap; gap: 3px; flex: none; max-width: 120px; }
+.steps span { font-family: var(--mono); font-size: 11px; padding: 2px 5px; border-radius: 3px; color: var(--dim);
+  background: rgba(0,0,0,0.3); }
+.steps span.sel { color: var(--glass); background: var(--accent); }
+
+.note { font-size: 12.5px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.note span::before { content: "•"; color: var(--dim); margin-right: 6px; }
+
+footer { color: var(--dim); font-size: 12.5px; max-width: 80ch; }
+footer code { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+@media (max-width: 980px) {
+  .row { grid-template-columns: 1fr; gap: 40px; justify-items: stretch; }
+  .macro { justify-self: center; }
+}
+@media (max-width: 480px) {
+  .plate { padding: 16px; }
+  .knob { width: 150px; height: 150px; }
+  .deps { grid-template-columns: 1fr 1fr; gap: 8px; }
+  .steps { max-width: 92px; }
+}
+
+/* ---------- "Try your own!" lens (top right) ---------- */
+header { position: relative; padding-right: 170px; }
+.lens { position: absolute; top: -6px; right: 0; width: 150px; height: 150px; padding: 0; border: 0;
+  background: none; cursor: pointer; border-radius: 50%; color: var(--ink); }
+.lens svg { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 8px 14px rgba(0,0,0,0.55)); }
+.lens .ring { transform-origin: 100px 100px; transition: transform 0.9s cubic-bezier(.2,.7,.2,1); }
+.lens:hover .ring, .lens:focus-visible .ring { transform: rotate(-40deg); }
+.lens:focus-visible { outline: 2px solid var(--lcd); outline-offset: 4px; }
+.lens .glint { transition: opacity 0.3s; opacity: 0.75; }
+.lens:hover .glint { opacity: 1; }
+@media (max-width: 640px) {
+  header { padding-right: 104px; }
+  .lens { width: 96px; height: 96px; top: -4px; }
+}
+
+/* ---------- try dialog ---------- */
+dialog.try { width: min(980px, calc(100vw - 24px)); max-height: calc(100dvh - 24px); padding: 0; border: 1px solid #000;
+  border-radius: 12px; background: linear-gradient(180deg, var(--plate-hi), var(--plate) 30%); color: var(--ink);
+  box-shadow: 0 30px 80px rgba(0,0,0,0.6); }
+dialog.try::backdrop { background: rgba(8,9,11,0.72); }
+.try-inner { display: grid; gap: 14px; padding: 18px 20px 20px; }
+.try-head { display: flex; align-items: center; gap: 12px; }
+.try-head h2 { margin: 0; font-family: var(--display); font-weight: 600; font-size: 28px; letter-spacing: 0.06em; text-transform: uppercase; }
+.try-head .x { margin-left: auto; }
+.btn { font: 500 14px/1 var(--text); color: var(--ink); background: #1b1c20; border: 1px solid #000;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.08); border-radius: 6px; padding: 10px 14px; cursor: pointer; }
+.btn:hover:not(:disabled) { background: #26282d; }
+.btn:disabled { opacity: 0.45; cursor: default; }
+.btn.primary { background: var(--ink); color: var(--glass); border-color: var(--ink); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { background: #fff; }
+.btn:focus-visible { outline: 2px solid var(--lcd); outline-offset: 2px; }
+.try-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.try-status { font-size: 13.5px; color: var(--muted); min-height: 1.4em; }
+.try-status.err { color: #ff8a7a; }
+.stage { position: relative; background: #000; border-radius: 8px; overflow: hidden; box-shadow: inset 0 0 0 1px #000; }
+.stage video { display: block; width: 100%; height: auto; max-height: 62dvh; object-fit: contain; }
+.stage canvas { display: block; width: auto; height: auto; max-width: 100%; max-height: 62dvh; margin: 0 auto; }
+.stage canvas { cursor: crosshair; touch-action: manipulation; }
+.seg { display: inline-flex; border: 1px solid #000; border-radius: 6px; overflow: hidden; }
+.seg button { font: 500 13px/1 var(--text); padding: 9px 12px; border: 0; background: #1b1c20; color: var(--muted); cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--glass); }
+.server-help { display: grid; gap: 10px; background: rgba(0,0,0,0.25); border: 1px solid rgba(0,0,0,0.5); border-radius: 8px; padding: 14px 16px; }
+.server-help p { margin: 0; color: #cfd0cf; max-width: 70ch; }
+.cmd { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.cmd code { font-family: var(--mono); font-size: 13px; background: var(--glass); color: var(--lcd); padding: 8px 10px; border-radius: 5px;
+  user-select: all; overflow-x: auto; max-width: 100%; }
+.legend { font-size: 12.5px; color: var(--dim); }
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; }
+}
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <button class="lens" id="tryButton" type="button" aria-label="Try your own object: upload a photo or use the camera">
+      <svg viewBox="0 0 200 200" aria-hidden="true">
+        <defs>
+          <radialGradient id="lensGlass" cx="42%" cy="38%" r="70%">
+            <stop offset="0" stop-color="#2a2f45"/><stop offset="0.45" stop-color="#11131c"/><stop offset="1" stop-color="#030405"/>
+          </radialGradient>
+          <radialGradient id="lensBarrel" cx="50%" cy="30%" r="75%">
+            <stop offset="0" stop-color="#3a3d43"/><stop offset="1" stop-color="#0c0d0f"/>
+          </radialGradient>
+          <path id="lensText" d="M100 100 m-80 0 a80 80 0 1 1 160 0 a80 80 0 1 1 -160 0"/>
+        </defs>
+        <circle cx="100" cy="100" r="99" fill="#08090a"/>
+        <g class="ring">
+          <circle cx="100" cy="100" r="96" fill="url(#lensBarrel)" stroke="#000" stroke-width="1.5"/>
+          <text font-family="Barlow Condensed, Arial Narrow, sans-serif" font-weight="700" font-size="17" letter-spacing="3.2" fill="#ecebe7">
+            <textPath href="#lensText" startOffset="0">TRY YOUR OWN! &#9679; TRY YOUR OWN! &#9679;</textPath>
+          </text>
+        </g>
+        <circle cx="100" cy="100" r="68" fill="#050506" stroke="#2c2e33" stroke-width="2"/>
+        <circle cx="100" cy="100" r="60" fill="url(#lensGlass)"/>
+        <circle cx="100" cy="100" r="44" fill="none" stroke="rgba(168,136,245,0.35)" stroke-width="1.2"/>
+        <circle cx="100" cy="100" r="28" fill="none" stroke="rgba(112,214,162,0.25)" stroke-width="1"/>
+        <g class="glint">
+          <ellipse cx="80" cy="76" rx="20" ry="11" transform="rotate(-35 80 76)" fill="rgba(168,136,245,0.45)"/>
+          <ellipse cx="122" cy="126" rx="10" ry="5" transform="rotate(-35 122 126)" fill="rgba(112,214,162,0.35)"/>
+          <circle cx="76" cy="72" r="4" fill="rgba(255,255,255,0.85)"/>
+        </g>
+        <circle cx="100" cy="23" r="3.2" fill="var(--red)"/>
+      </svg>
+    </button>
+    <div class="brand"><i></i>OBJECTSYNTH</div>
+    <h1>Macro map</h1>
+    <p class="lede">Every preset starts as a photo and the object's SAM mask. Six measurements are taken, each is
+      mapped to 0–1 with a fixed range, and each macro then turns its own synth parameters. Turn a macro knob
+      (drag, scroll or arrow keys) and watch what follows, or load one of the objects we photographed.</p>
+    <div class="chain"><span>photo + SAM mask</span><b>→</b><span>measurement</span><b>→</b><span>fixed range → 0–1</span><b>→</b><span>macro</span><b>→</b><span>synth parameters</span></div>
+  </header>
+
+  <section class="picker" aria-label="Objects">
+    <div class="eyebrow">Load an object</div>
+    <div class="chips" id="chips"></div>
+  </section>
+
+  <main id="plates" style="display:grid;gap:22px"></main>
+
+  <footer>Measurements and their ranges come from <code>CV/macros.py</code> (<code>MACRO_RANGES</code>); curves and
+    thresholds from <code>CV/macro_mapping.py</code>. Object values are the camera presets in <code>CV/presets</code>.
+    Parameters a macro does not touch keep the synth's init values.</footer>
+</div>
+
+
+<dialog class="try" id="tryDialog" aria-labelledby="tryTitle">
+  <div class="try-inner">
+    <div class="try-head">
+      <h2 id="tryTitle">Try your own</h2>
+      <button class="btn x" type="button" id="tryClose">Close</button>
+    </div>
+
+    <div class="server-help" id="tryServer" hidden>
+      <p><strong>The macro server is not running.</strong> It runs our own SAM and macro code (CV/macro_server.py) on this
+        computer. From the repository folder, start it with:</p>
+      <div class="cmd"><code>.venv/bin/python CV/macro_server.py</code><button class="btn" type="button" id="tryCopy">Copy</button></div>
+      <p>Then open <code style="font-family:var(--mono)">http://127.0.0.1:8765</code> (the camera works there in every browser), or press Retry.</p>
+      <div class="try-row"><button class="btn primary" type="button" id="tryRetry">Retry</button></div>
+    </div>
+
+    <div class="try-row" id="trySource" hidden>
+      <label class="btn primary" for="tryFile">Upload a photo</label>
+      <input type="file" id="tryFile" accept="image/*" hidden>
+      <button class="btn" type="button" id="tryCamera">Use the camera</button>
+      <span class="legend">Plain background, object filling a good part of the frame, like our captures.</span>
+    </div>
+
+    <div class="stage" id="tryVideoStage" hidden><video id="tryVideo" playsinline muted></video></div>
+    <div class="try-row" id="tryVideoControls" hidden>
+      <button class="btn primary" type="button" id="tryShoot">Take photo</button>
+      <button class="btn" type="button" id="tryVideoCancel">Back</button>
+    </div>
+
+    <div class="stage" id="tryPhotoStage" hidden><canvas id="tryCanvas"></canvas></div>
+    <div class="try-row" id="tryPhotoControls" hidden>
+      <div class="seg" role="group" aria-label="Click adds">
+        <button type="button" id="modeObject" aria-pressed="true">+ Object</button>
+        <button type="button" id="modeBackground" aria-pressed="false">− Background</button>
+      </div>
+      <button class="btn" type="button" id="tryClear">Clear points</button>
+      <button class="btn" type="button" id="tryAgain">Other photo</button>
+      <button class="btn primary" type="button" id="tryMeasure" disabled>Measure macros</button>
+    </div>
+
+    <div class="try-status" id="tryStatus" role="status"></div>
+  </div>
+</dialog>
+<script>
+(() => {
+  // ---------- mapping helpers (same as CV/macro_mapping.py) ----------
+  const linear = (m, a, b) => a + (b - a) * m;
+  const exponential = (m, a, b) => a * Math.pow(b / a, m);
+  const easeIn = (m, a, b, p = 3) => a + (b - a) * Math.pow(m, p);
+  const threshold = (m, at) => (m >= at ? 1 : 0);
+  const gatedLinear = (m, at, a, b, below = 0) => (m < at ? below : linear((m - at) / (1 - at), a, b));
+  const gatedEaseIn = (m, at, a, b, below = 0, p = 2) => (m < at ? below : easeIn((m - at) / (1 - at), a, b, p));
+  const stepped = (m, a, b) => Math.round(a + (b - a) * m);
+
+  const hz = v => (v >= 1000 ? [(v / 1000).toFixed(v < 10000 ? 2 : 1), "kHz"] : [v.toFixed(0), "Hz"]);
+  const sec = v => (v < 1 ? [(v * 1000).toFixed(0), "ms"] : [v.toFixed(2), "s"]);
+  const pct = v => [(v * 100).toFixed(0), "%"];
+  const num = d => v => [v.toFixed(d), ""];
+  const onOff = v => [v ? "ON" : "OFF", ""];
+
+  const DISTORTION_AT = 0.4, FILTER_ENV_AT = 0.3, UNISON_AT = 0.2, PLUCK_BELOW = 0.3, LFO_AT = 0.2, CHORUS_AT = 0.5;
+  const LFO_RATES = ["1/1", "1/2", "1/4", "1/8", "1/16"];
+
+  // kind: knob (continuous), switch, steps. lo/hi/log: the scale the mini knob and curve use.
+  const MACROS = [
+    {
+      key: "sharpness", group: "sharpness", label: "Sharpness", color: "var(--c-sharpness)",
+      tagline: "Soft, round objects stay clean; sharp ones bite and distort.",
+      algo: {
+        name: "Harris corner response", cite: "Harris & Stephens, 1988",
+        text: "Corners are found on the blurred silhouette (OpenCV cornerHarris, candidates from goodFeaturesToTrack) and only tips that point outwards count. Score = 0.6 × strength of the 3 sharpest tips + 0.4 × number of strong tips ÷ 10.",
+        input: "SAM mask", unit: "tip score", range: [0.0337791204219684, 1.118572393668816], digits: 3,
+      },
+      deps: [
+        { label: "Distortion", module: "Distortion", kind: "switch", f: s => threshold(s, DISTORTION_AT), gate: DISTORTION_AT, fmt: onOff, rel: "On from 0.40" },
+        { label: "Drive", module: "Distortion", kind: "knob", f: s => gatedEaseIn(s, DISTORTION_AT, 2, 10, 2), lo: 1, hi: 10, gate: DISTORTION_AT, fmt: num(2),
+          rel: "2 at 0.40, then rises slowly (squared) to 10", idle: s => s < DISTORTION_AT, idleText: "no effect: distortion off" },
+        { label: "Attack", module: "Envelope", kind: "knob", f: s => exponential(s, 0.050, 0.002), lo: 0.002, hi: 0.050, log: true, fmt: sec,
+          rel: "Exponential, 50 ms → 2 ms" },
+        { label: "Filter env", module: "Filter env", kind: "switch", f: s => threshold(s, FILTER_ENV_AT), gate: FILTER_ENV_AT, fmt: onOff, rel: "On from 0.30: a pluck at note start" },
+        { label: "Env amount", module: "Filter env", kind: "knob", f: s => linear(s, 0, 3), lo: 0, hi: 3, gate: FILTER_ENV_AT, fmt: num(2),
+          rel: "Linear, 0 → 3", idle: s => s < FILTER_ENV_AT, idleText: "no effect: filter env off" },
+      ],
+    },
+    {
+      key: "brightness", group: "brightness", label: "Brightness", color: "var(--c-brightness)",
+      tagline: "Dark objects sound muffled; bright objects open and airy.",
+      algo: {
+        name: "CIELAB lightness L*", cite: "white patch, after Land's Retinex",
+        text: "The photo is scaled so its brightest 1% of pixels is white, so exposure matters less. Score = mean perceptual lightness L* (0–100) inside the mask.",
+        input: "photo + SAM mask", unit: "L*", range: [18.921255111694336, 69.69278717041013], digits: 1,
+      },
+      deps: [
+        { label: "LP cutoff", module: "Filter bank", kind: "knob", f: b => exponential(b, 500, 18000), lo: 500, hi: 18000, log: true, fmt: hz,
+          rel: "Exponential, 500 Hz → 18 kHz" },
+        { label: "Voice cutoff", module: "Voice filter", kind: "knob", f: b => exponential(b, 400, 4000), lo: 400, hi: 4000, log: true, fmt: hz,
+          rel: "Exponential, 400 Hz → 4 kHz: where each note settles after the attack" },
+      ],
+      fixed: ["Filter bank always on", "Low-pass only (LP mix 100%, HP and BP 0%)"],
+    },
+    {
+      key: "body", group: "body", label: "Body", color: "var(--c-body)",
+      tagline: "Small objects sound thin and short; big ones thick, wide and long.",
+      algo: {
+        name: "Size in the frame", cite: "largest connected component of the mask",
+        text: "Score = √(mask area ÷ frame area): the object's linear size. It changes with the distance from the camera, so the same object near and far gives different presets.",
+        input: "SAM mask", unit: "size", range: [0.08, 0.65], digits: 3,
+      },
+      deps: [
+        { label: "Unison", module: "Unison", kind: "switch", f: c => threshold(c, UNISON_AT), gate: UNISON_AT, fmt: onOff, rel: "On from 0.20" },
+        { label: "Voices", module: "Unison", kind: "steps", f: c => stepped(c, 1, 7), options: [1, 2, 3, 4, 5, 6, 7], lo: 1, hi: 7, fmt: num(0),
+          rel: "Stepped, 1 → 7", idle: c => c < UNISON_AT, idleText: "no effect: unison off" },
+        { label: "Spread", module: "Unison", kind: "knob", f: c => linear(c, 0.2, 1), lo: 0, hi: 1, fmt: pct,
+          rel: "Linear, 20% → 100% stereo width", idle: c => c < UNISON_AT, idleText: "no effect: unison off" },
+        { label: "Sustain", module: "Envelope", kind: "knob", f: c => gatedLinear(c, PLUCK_BELOW, 0.4, 0.9, 0), lo: 0, hi: 1, gate: PLUCK_BELOW, fmt: pct,
+          rel: "0 below 0.30 (a pluck), then 40% → 90%" },
+        { label: "Decay", module: "Envelope", kind: "knob", f: c => exponential(c, 0.2, 1.2), lo: 0.2, hi: 1.2, log: true, fmt: sec,
+          rel: "Exponential, 200 ms → 1.2 s" },
+        { label: "Release", module: "Envelope", kind: "knob", f: c => exponential(c, 0.1, 1.5), lo: 0.1, hi: 1.5, log: true, fmt: sec,
+          rel: "Exponential, 100 ms → 1.5 s" },
+      ],
+    },
+    {
+      key: "asymmetry", group: "movement", label: "Asymmetry", color: "var(--c-movement)",
+      tagline: "A lopsided object gives out-of-tune, beating voices.",
+      algo: {
+        name: "Mirror IoU", cite: "principal axes from image moments",
+        text: "The silhouette is aligned to its principal axes and mirrored across each. Score = 1 − overlap (IoU) with its mirror image, on the more symmetric axis: 0 for a perfectly symmetric shape.",
+        input: "SAM mask", unit: "1 − IoU", range: [0.108819174659801, 0.8327812406284156], digits: 3,
+      },
+      deps: [
+        { label: "Detune", module: "Unison", kind: "knob", f: a => linear(a, 3, 20), lo: 0, hi: 20, fmt: v => [v.toFixed(1), "ct"],
+          rel: "Linear, 3 → 20 cents. Never 0: identical voices only sound phasey",
+          idle: () => state.body < UNISON_AT, idleText: "no effect: unison off (Body)" },
+      ],
+    },
+    {
+      key: "texture", group: "movement", label: "Texture", color: "var(--c-movement)",
+      tagline: "Busy surfaces pulse: faster and deeper.",
+      algo: {
+        name: "Canny edge density", cite: "Canny, 1986",
+        text: "Edges are found on the blurred grey photo; the mask is shrunk by 15 px so the outline does not count. Score = share of edge pixels inside the object: print, lines, patterns.",
+        input: "photo + SAM mask", unit: "edge share", range: [0.0025666777586676555, 0.09157268286631141], digits: 4,
+      },
+      deps: [
+        { label: "LFO", module: "LFO", kind: "switch", f: t => threshold(t, LFO_AT), gate: LFO_AT, fmt: onOff, rel: "On from 0.20" },
+        { label: "Rate", module: "LFO", kind: "steps", f: t => Math.min(Math.floor(t * 5), 4), options: LFO_RATES, lo: 0, hi: 4,
+          fmt: v => [LFO_RATES[v], "bar"], rel: "Five tempo steps, 1/1 → 1/16", idle: t => t < LFO_AT, idleText: "no effect: LFO off" },
+        { label: "Depth → LP", module: "LFO route 1", kind: "knob", f: t => linear(t, 0.1, 0.6), lo: 0, hi: 1, fmt: num(2),
+          rel: "Linear, 0.10 → 0.60 on the filter bank's LP cutoff", idle: t => t < LFO_AT, idleText: "no effect: LFO off" },
+      ],
+      fixed: ["LFO waveform: sine", "Route 1 destination: LP cutoff"],
+    },
+    {
+      key: "colorfulness", group: "movement", label: "Colorfulness", color: "var(--c-movement)",
+      tagline: "Vivid colours give a richer, moving sound; skin sits around 0.6.",
+      algo: {
+        name: "CIELAB chroma C*", cite: "after the same white patch",
+        text: "Score = mean chroma √(a*² + b*²) inside the mask: how far the colours are from grey, whatever their hue.",
+        input: "photo + SAM mask", unit: "C*", range: [3.511051225662232, 39.082034301757766], digits: 1,
+      },
+      deps: [
+        { label: "Chorus", module: "Chorus", kind: "switch", f: k => threshold(k, CHORUS_AT), gate: CHORUS_AT, fmt: onOff, rel: "On from 0.50: only clearly colourful objects" },
+        { label: "Mix", module: "Chorus", kind: "knob", f: k => easeIn(k, 0.08, 0.30), lo: 0, hi: 0.5, fmt: pct,
+          rel: "Slow (cubed), 8% → 30%: low until the most vivid colours", idle: k => k < CHORUS_AT, idleText: "no effect: chorus off" },
+        { label: "Depth", module: "Chorus", kind: "knob", f: k => linear(k, 0.15, 0.45), lo: 0, hi: 1, fmt: pct,
+          rel: "Linear, 15% → 45%", idle: k => k < CHORUS_AT, idleText: "no effect: chorus off" },
+      ],
+    },
+  ];
+
+  const OBJECTS = [
+    {"name":"chiave_2","sharpness":0.776,"brightness":0.957,"body":0.212,"asymmetry":0.301,"texture":0.252,"colorfulness":0.343},
+    {"name":"chiave_1","sharpness":0.558,"brightness":0.667,"body":0.085,"asymmetry":0.189,"texture":0.189,"colorfulness":0.181},
+    {"name":"coltello","sharpness":0.619,"brightness":1.0,"body":0.154,"asymmetry":0.15,"texture":0.008,"colorfulness":0.406},
+    {"name":"matita","sharpness":0.485,"brightness":0.045,"body":0.036,"asymmetry":0.0,"texture":0.768,"colorfulness":0.076},
+    {"name":"mano_1","sharpness":0.733,"brightness":0.77,"body":0.833,"asymmetry":0.351,"texture":0.0,"colorfulness":0.609},
+    {"name":"mano_2","sharpness":0.102,"brightness":0.956,"body":0.428,"asymmetry":0.433,"texture":0.0,"colorfulness":0.579},
+    {"name":"mano_3","sharpness":0.177,"brightness":1.0,"body":0.467,"asymmetry":0.42,"texture":0.0,"colorfulness":0.614},
+    {"name":"melità","sharpness":0.463,"brightness":0.234,"body":0.562,"asymmetry":0.189,"texture":0.04,"colorfulness":0.524},
+    {"name":"umbrella","sharpness":0.532,"brightness":0.209,"body":0.399,"asymmetry":0.002,"texture":0.086,"colorfulness":0.104},
+    {"name":"TAG Vancouver","sharpness":0.347,"brightness":0.458,"body":0.098,"asymmetry":0.0,"texture":0.047,"colorfulness":1.0},
+    {"name":"milkpro","sharpness":0.368,"brightness":0.887,"body":0.352,"asymmetry":0.0,"texture":0.559,"colorfulness":0.836},
+    {"name":"barattolo","sharpness":0.371,"brightness":0.857,"body":0.355,"asymmetry":0.37,"texture":0.006,"colorfulness":0.691},
+    {"name":"cucchiaio","sharpness":0.282,"brightness":1.0,"body":0.139,"asymmetry":0.0,"texture":0.0,"colorfulness":0.267},
+    {"name":"lemon","sharpness":0.213,"brightness":1.0,"body":0.053,"asymmetry":0.078,"texture":0.071,"colorfulness":1.0},
+    {"name":"lemon big","sharpness":0.013,"brightness":1.0,"body":0.33,"asymmetry":0.115,"texture":0.015,"colorfulness":1.0},
+    {"name":"pam cheese","sharpness":0.15,"brightness":1.0,"body":0.648,"asymmetry":0.016,"texture":0.144,"colorfulness":0.555},
+    {"name":"julia","sharpness":0.197,"brightness":0.303,"body":0.833,"asymmetry":0.312,"texture":0.04,"colorfulness":0.497},
+    {"name":"giovanni","sharpness":0.0,"brightness":0.15,"body":0.9,"asymmetry":0.384,"texture":0.018,"colorfulness":0.207},
+    {"name":"spartito_1","sharpness":0.0,"brightness":0.921,"body":0.895,"asymmetry":0.0,"texture":1.0,"colorfulness":0.029},
+    {"name":"spartito_2","sharpness":0.0,"brightness":0.727,"body":1.0,"asymmetry":0.019,"texture":0.985,"colorfulness":0.051},
+    {"name":"cellujack","sharpness":0.0,"brightness":0.544,"body":0.518,"asymmetry":0.0,"texture":1.0,"colorfulness":0.176},
+    {"name":"tessera_1","sharpness":0.0,"brightness":0.556,"body":0.334,"asymmetry":0.0,"texture":0.293,"colorfulness":0.192},
+    {"name":"tessera_2","sharpness":0.046,"brightness":0.736,"body":0.474,"asymmetry":0.0,"texture":0.287,"colorfulness":0.049},
+    {"name":"tazzina","sharpness":0.0,"brightness":1.0,"body":0.188,"asymmetry":0.027,"texture":0.0,"colorfulness":0.309},
+    {"name":"tazza","sharpness":0.0,"brightness":0.796,"body":0.262,"asymmetry":0.184,"texture":0.0,"colorfulness":0.178},
+    {"name":"glas","sharpness":0.068,"brightness":0.799,"body":0.329,"asymmetry":0.0,"texture":0.143,"colorfulness":0.369},
+    {"name":"telecomando","sharpness":0.02,"brightness":1.0,"body":0.416,"asymmetry":0.0,"texture":0.0,"colorfulness":0.004},
+    {"name":"cuffie","sharpness":0.079,"brightness":0.0,"body":0.418,"asymmetry":0.318,"texture":0.0,"colorfulness":0.103},
+    {"name":"cuffie2","sharpness":0.0,"brightness":1.0,"body":0.856,"asymmetry":0.0,"texture":0.0,"colorfulness":0.0},
+    {"name":"cuffiejack","sharpness":0.0,"brightness":1.0,"body":0.144,"asymmetry":0.0,"texture":0.0,"colorfulness":0.085}
+  ];
+
+  const state = Object.fromEntries(MACROS.map(m => [m.key, 0.5]));
+  const NS = "http://www.w3.org/2000/svg";
+  const el = (tag, cls, html) => { const e = document.createElement(tag); if (cls) e.className = cls; if (html != null) e.innerHTML = html; return e; };
+  const svgEl = (tag, attrs) => { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); return e; };
+  const clamp = v => Math.min(1, Math.max(0, v));
+  const lcd = (parts) => `${parts[0]}${parts[1] ? `<small>${parts[1]}</small>` : ""}`;
+
+  // ---------- knob drawing ----------
+  const START = -135, SWEEP = 270;
+  const polar = (cx, cy, r, deg) => { const a = (deg - 90) * Math.PI / 180; return [cx + r * Math.cos(a), cy + r * Math.sin(a)]; };
+  const arc = (cx, cy, r, a0, a1) => {
+    if (a1 - a0 < 0.01) a1 = a0 + 0.01;
+    const [x0, y0] = polar(cx, cy, r, a0), [x1, y1] = polar(cx, cy, r, a1);
+    return `M${x0.toFixed(2)} ${y0.toFixed(2)} A${r} ${r} 0 ${a1 - a0 > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+  };
+  let gradId = 0;
+  function buildKnob(size, big, color) {
+    const s = svgEl("svg", { viewBox: "0 0 200 200", "aria-hidden": "true" });
+    const id = "g" + (gradId++);
+    const defs = svgEl("defs", {});
+    const rg = svgEl("radialGradient", { id, cx: "40%", cy: "32%", r: "75%" });
+    rg.append(svgEl("stop", { offset: "0", "stop-color": "#4a4d53" }), svgEl("stop", { offset: "0.55", "stop-color": "#1d1f23" }), svgEl("stop", { offset: "1", "stop-color": "#0b0c0e" }));
+    defs.append(rg); s.append(defs);
+    // scale ticks
+    for (let i = 0; i <= (big ? 20 : 10); i++) {
+      const deg = START + SWEEP * i / (big ? 20 : 10);
+      const [x0, y0] = polar(100, 100, 92, deg), [x1, y1] = polar(100, 100, i % 5 === 0 ? 99 : 96, deg);
+      s.append(svgEl("line", { x1: x0, y1: y0, x2: x1, y2: y1, stroke: "#6b6f76", "stroke-width": big ? 1.6 : 3, "stroke-linecap": "round" }));
+    }
+    s.append(svgEl("path", { d: arc(100, 100, 84, START, START + SWEEP), stroke: "#0a0b0d", "stroke-width": big ? 7 : 14, fill: "none", "stroke-linecap": "round" }));
+    const value = svgEl("path", { d: "", stroke: color, "stroke-width": big ? 5 : 11, fill: "none", "stroke-linecap": "round" });
+    s.append(value);
+    // body with knurled rim
+    s.append(svgEl("circle", { cx: 100, cy: 104, r: 70, fill: "#000", opacity: 0.45 }));
+    s.append(svgEl("circle", { cx: 100, cy: 100, r: 70, fill: `url(#${id})`, stroke: "#000", "stroke-width": 1.5 }));
+    const rim = svgEl("g", {});
+    if (big) for (let i = 0; i < 72; i++) {
+      const deg = i * 5, [x0, y0] = polar(100, 100, 63, deg), [x1, y1] = polar(100, 100, 69, deg);
+      rim.append(svgEl("line", { x1: x0, y1: y0, x2: x1, y2: y1, stroke: "rgba(255,255,255,0.10)", "stroke-width": 1.2 }));
+    }
+    s.append(rim);
+    s.append(svgEl("circle", { cx: 100, cy: 100, r: big ? 54 : 58, fill: "none", stroke: "rgba(255,255,255,0.06)", "stroke-width": 1 }));
+    const pointer = svgEl("line", { x1: 100, y1: 100, x2: 100, y2: 40, stroke: "#ecebe7", "stroke-width": big ? 4 : 9, "stroke-linecap": "round" });
+    s.append(pointer);
+    s.append(svgEl("circle", { cx: 100, cy: 100, r: big ? 9 : 13, fill: "#121316", stroke: "rgba(255,255,255,0.08)" }));
+    if (big) s.append(svgEl("path", { d: "M94 2 L106 2 L100 11 Z", fill: "var(--red)" }));
+    return {
+      svg: s,
+      set(f) {
+        const deg = START + SWEEP * clamp(f);
+        value.setAttribute("d", arc(100, 100, 84, START, deg));
+        pointer.setAttribute("transform", `rotate(${deg} 100 100)`);
+      },
+    };
+  }
+
+  // ---------- curve drawing ----------
+  function scaleOf(dep) {
+    if (dep.kind === "switch") return v => v;
+    if (dep.log) return v => (Math.log(v) - Math.log(dep.lo)) / (Math.log(dep.hi) - Math.log(dep.lo));
+    return v => (v - dep.lo) / (dep.hi - dep.lo);
+  }
+  function buildCurve(dep, color) {
+    const W = 160, H = 42, P = 4;
+    const s = svgEl("svg", { class: "curve", viewBox: `0 0 ${W} ${H}`, preserveAspectRatio: "none", "aria-hidden": "true" });
+    const sc = scaleOf(dep);
+    s.append(svgEl("rect", { x: 0, y: 0, width: W, height: H, rx: 4, fill: "#0c0d0f" }));
+    for (const g of [0.25, 0.5, 0.75]) s.append(svgEl("line", { x1: g * W, y1: 0, x2: g * W, y2: H, stroke: "rgba(255,255,255,0.05)" }));
+    if (dep.gate != null) s.append(svgEl("line", { x1: dep.gate * W, y1: 0, x2: dep.gate * W, y2: H, stroke: "var(--dim)", "stroke-dasharray": "2 3" }));
+    let d = "", prevY = null;
+    for (let i = 0; i <= 200; i++) {
+      const m = i / 200, y = H - P - clamp(sc(dep.f(m))) * (H - 2 * P), x = m * W;
+      if (prevY !== null && Math.abs(y - prevY) > 6) d += `L${x.toFixed(1)} ${prevY.toFixed(1)}`;  // vertical step
+      d += (i ? "L" : "M") + x.toFixed(1) + " " + y.toFixed(1);
+      prevY = y;
+    }
+    s.append(svgEl("path", { d, fill: "none", stroke: color, "stroke-width": 1.6, "vector-effect": "non-scaling-stroke", opacity: 0.9 }));
+    const dot = svgEl("circle", { r: 3.2, fill: "#ecebe7", stroke: "#000", "stroke-width": 1, "vector-effect": "non-scaling-stroke" });
+    s.append(dot);
+    return {
+      svg: s,
+      set(m) { dot.setAttribute("cx", m * W); dot.setAttribute("cy", H - P - clamp(sc(dep.f(m))) * (H - 2 * P)); },
+    };
+  }
+
+  // ---------- build page ----------
+  const plates = document.getElementById("plates");
+  const groups = {};
+  const views = {};
+
+  for (const macro of MACROS) {
+    let plate = groups[macro.group];
+    if (!plate) {
+      plate = el("section", "plate");
+      const g = macro.group === "movement"
+        ? { label: "Movement", color: "var(--c-movement)", tagline: "Three measurements, each moving its own part of the sound. Movement itself is their mean and only places the object among the others." }
+        : macro;
+      plate.style.setProperty("--accent", g.color);
+      const head = el("div", "plate-head");
+      head.append(el("h2", "", g.label), el("p", "", g.tagline));
+      if (macro.group === "movement") {
+        const mean = el("div", "mean", `Movement (mean) <span class="lcd" id="movementMean">0.50</span>`);
+        head.append(mean);
+      }
+      plate.append(head);
+      plates.append(plate);
+      groups[macro.group] = plate;
+    }
+
+    const row = el("div", "row");
+    row.style.setProperty("--accent", macro.color);
+    const links = svgEl("svg", { class: "links", "aria-hidden": "true" });
+    row.append(links);
+
+    // measurement
+    const algo = el("article", "algo");
+    algo.append(
+      el("div", "eyebrow", "Measure"),
+      el("h3", "", macro.algo.name),
+      el("div", "cite", macro.algo.cite),
+      el("p", "", macro.algo.text),
+      el("div", "input", `input: ${macro.algo.input}`),
+    );
+    const raw = el("div", "rawbar");
+    const rawTop = el("div", "", "");
+    rawTop.style.cssText = "display:flex;justify-content:space-between;align-items:center;gap:8px";
+    const rawLcd = el("span", "lcd");
+    rawTop.append(el("span", "eyebrow", "Raw"), rawLcd);
+    const track = el("div", "track"), fill = el("div", "fill");
+    track.append(fill);
+    const [lo, hi] = macro.algo.range, dg = macro.algo.digits;
+    raw.append(rawTop, track, el("div", "ends", `<span>0 = ${lo.toFixed(dg)}</span><span>1 = ${hi.toFixed(dg)}</span>`));
+    algo.append(raw);
+
+    // macro knob
+    const col = el("div", "macro");
+    const knobBox = el("div", "knob");
+    knobBox.tabIndex = 0;
+    knobBox.setAttribute("role", "slider");
+    knobBox.setAttribute("aria-label", macro.label);
+    knobBox.setAttribute("aria-valuemin", "0");
+    knobBox.setAttribute("aria-valuemax", "1");
+    const knob = buildKnob(180, true, macro.color);
+    knobBox.append(knob.svg);
+    const valueLcd = el("span", "lcd");
+    valueLcd.style.fontSize = "18px";
+    col.append(knobBox, el("div", "name", macro.label), valueLcd, el("div", "hint", "drag · scroll · arrow keys"));
+
+    // dependents
+    const deps = el("div", "deps");
+    const depViews = macro.deps.map(dep => {
+      const card = el("div", "dep");
+      const top = el("div", "top");
+      top.append(el("span", "label", dep.label), el("span", "module", dep.module));
+      const mid = el("div", "mid");
+      let visual;
+      if (dep.kind === "switch") {
+        const led = el("div", "led", `<div class="cap"><div class="dot"></div></div>`);
+        mid.append(led);
+        visual = { set: v => led.classList.toggle("on", !!v) };
+      } else if (dep.kind === "steps") {
+        const box = el("div", "steps");
+        const spans = dep.options.map(o => { const s = el("span", "", String(o)); box.append(s); return s; });
+        mid.append(box);
+        visual = { set: v => spans.forEach((s, i) => s.classList.toggle("sel", (dep.options === LFO_RATES ? i : dep.options[i]) === v)) };
+      } else {
+        const k = buildKnob(56, false, macro.color);
+        const box = el("div", "mini"); box.append(k.svg); mid.append(box);
+        const sc = scaleOf(dep);
+        visual = { set: v => k.set(sc(v)) };
+      }
+      const out = el("span", "lcd");
+      mid.append(out);
+      const curve = buildCurve(dep, macro.color);
+      const st = el("div", "state");
+      card.append(top, mid, curve.svg, el("div", "rel", dep.rel), st);
+      deps.append(card);
+      return { dep, card, visual, out, curve, st };
+    });
+
+    row.append(algo, col, deps);
+    groups[macro.group].append(row);
+    if (macro.fixed) {
+      const note = el("div", "note");
+      note.innerHTML = `<b style="font-weight:500">Always set:</b>` + macro.fixed.map(t => `<span>${t}</span>`).join("");
+      groups[macro.group].append(note);
+    }
+
+    views[macro.key] = { macro, row, links, algo, col, knobBox, knob, valueLcd, rawLcd, fill, deps, depViews, paths: [] };
+    attachKnob(macro.key, knobBox);
+  }
+
+  // ---------- interaction ----------
+  let active = null;
+  function setMacro(key, v, fromUser) {
+    state[key] = clamp(v);
+    if (fromUser && active) { active = null; markChips(); }
+    renderAll();
+  }
+  function attachKnob(key, box) {
+    let startY = 0, startX = 0, startV = 0, dragging = false;
+    box.addEventListener("pointerdown", e => {
+      dragging = true; startY = e.clientY; startX = e.clientX; startV = state[key];
+      box.setPointerCapture(e.pointerId); box.focus({ preventScroll: true }); e.preventDefault();
+    });
+    box.addEventListener("pointermove", e => {
+      if (!dragging) return;
+      const delta = ((startY - e.clientY) + (e.clientX - startX)) / 220;
+      setMacro(key, startV + delta, true);
+    });
+    const end = () => { dragging = false; };
+    box.addEventListener("pointerup", end);
+    box.addEventListener("pointercancel", end);
+    box.addEventListener("wheel", e => { e.preventDefault(); setMacro(key, state[key] - e.deltaY * 0.0012, true); }, { passive: false });
+    box.addEventListener("keydown", e => {
+      const step = { ArrowUp: 0.01, ArrowRight: 0.01, ArrowDown: -0.01, ArrowLeft: -0.01, PageUp: 0.1, PageDown: -0.1 }[e.key];
+      if (step != null) { e.preventDefault(); setMacro(key, state[key] + step, true); }
+      else if (e.key === "Home") { e.preventDefault(); setMacro(key, 0, true); }
+      else if (e.key === "End") { e.preventDefault(); setMacro(key, 1, true); }
+    });
+  }
+
+  // ---------- objects ----------
+  const chips = document.getElementById("chips");
+  const chipEls = OBJECTS.map(o => {
+    const b = el("button", "chip", o.name);
+    b.type = "button";
+    b.setAttribute("aria-pressed", "false");
+    b.addEventListener("click", () => loadObject(o));
+    chips.append(b);
+    return [o, b];
+  });
+  function markChips() { chipEls.forEach(([o, b]) => b.setAttribute("aria-pressed", String(o === active))); }
+  const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let anim = 0;
+  function loadObject(o) {
+    active = o; markChips();
+    const from = { ...state }, t0 = performance.now(), dur = reduced ? 0 : 520, id = ++anim;
+    const ease = t => 1 - Math.pow(1 - t, 3);
+    const step = now => {
+      if (id !== anim) return;
+      const t = dur ? Math.min(1, (now - t0) / dur) : 1;
+      for (const m of MACROS) state[m.key] = from[m.key] + (o[m.key] - from[m.key]) * ease(t);
+      renderAll();
+      if (t < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }
+
+  // ---------- render ----------
+  function renderAll() {
+    for (const key in views) {
+      const v = views[key], m = state[key], [lo, hi] = v.macro.algo.range;
+      v.knob.set(m);
+      v.knobBox.setAttribute("aria-valuenow", m.toFixed(2));
+      v.valueLcd.innerHTML = m.toFixed(2);
+      const rawValue = lo + m * (hi - lo);
+      const prefix = m <= 0 ? "≤ " : m >= 1 ? "≥ " : "";
+      v.rawLcd.innerHTML = lcd([prefix + rawValue.toFixed(v.macro.algo.digits), v.macro.algo.unit]);
+      v.fill.style.width = (m * 100) + "%";
+      v.depViews.forEach((d, i) => {
+        const value = d.dep.f(m);
+        d.visual.set(value);
+        d.out.innerHTML = lcd(d.dep.fmt(value));
+        d.curve.set(m);
+        const idle = d.dep.idle ? d.dep.idle(m) : false;
+        const off = d.dep.kind === "switch" && !value;
+        d.card.classList.toggle("idle", idle);
+        d.st.textContent = idle ? d.dep.idleText : "";
+        if (!v.stacked) setLink(v.paths[i + 1], key, !(idle || off));
+      });
+      setLink(v.paths[0], key, true);
+      if (v.stacked) setLink(v.paths[1], key, true);
+    }
+    const mean = (state.asymmetry + state.texture + state.colorfulness) / 3;
+    document.getElementById("movementMean").textContent = mean.toFixed(2);
+  }
+
+  // ---------- arrows ----------
+  function setLink(path, key, on) {
+    if (!path) return;
+    path.setAttribute("class", on ? "on" : "off");
+    path.setAttribute("marker-end", `url(#arrow-${key}-${on ? "on" : "off"})`);
+  }
+  function link(svg, a, b, rowBox) {
+    const ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+    let x1, y1, x2, y2, d;
+    if (rb.left >= ra.right - 2) {
+      x1 = ra.right - rowBox.left + 4; y1 = ra.top + ra.height / 2 - rowBox.top;
+      x2 = rb.left - rowBox.left - 6; y2 = rb.top + rb.height / 2 - rowBox.top;
+      const dx = Math.max(16, (x2 - x1) / 2);
+      d = `M${x1} ${y1} C${x1 + dx} ${y1}, ${x2 - dx} ${y2}, ${x2} ${y2}`;
+    } else {
+      x1 = ra.left + ra.width / 2 - rowBox.left; y1 = ra.bottom - rowBox.top + 4;
+      x2 = rb.left + rb.width / 2 - rowBox.left; y2 = rb.top - rowBox.top - 6;
+      const dy = Math.max(12, (y2 - y1) / 2);
+      d = `M${x1} ${y1} C${x1} ${y1 + dy}, ${x2} ${y2 - dy}, ${x2} ${y2}`;
+    }
+    const path = svgEl("path", { d });
+    svg.append(path);
+    return path;
+  }
+  function layoutLinks() {
+    for (const key in views) {
+      const v = views[key];
+      v.links.replaceChildren();
+      const defs = svgEl("defs", {});
+      for (const [suffix, fill] of [["on", "var(--accent)"], ["off", "var(--dim)"]]) {
+        const marker = svgEl("marker", { id: `arrow-${key}-${suffix}`, viewBox: "0 0 10 10", refX: 8, refY: 5,
+          markerWidth: 7, markerHeight: 7, orient: "auto", markerUnits: "strokeWidth" });
+        marker.append(svgEl("path", { d: "M0 1 L9 5 L0 9 z", fill, stroke: "none" }));
+        defs.append(marker);
+      }
+      v.links.append(defs);
+      const box = v.row.getBoundingClientRect();
+      v.paths = [link(v.links, v.algo, v.knobBox, box)];
+      const stacked = v.deps.getBoundingClientRect().left < v.knobBox.getBoundingClientRect().right;
+      v.stacked = stacked;
+      if (stacked) {
+        v.paths.push(link(v.links, v.knobBox, v.deps, box));
+      } else {
+        v.depViews.forEach(d => v.paths.push(link(v.links, v.knobBox, d.card, box)));
+      }
+    }
+    renderAll();
+  }
+
+  new ResizeObserver(() => layoutLinks()).observe(plates);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(layoutLinks);
+  layoutLinks();
+
+  // ---------- "Try your own!": photo -> SAM mask -> macros, via CV/macro_server.py ----------
+  const SERVER = location.protocol === "http:" && location.hostname === "127.0.0.1" ? "" : "http://127.0.0.1:8765";
+  const $ = id => document.getElementById(id);
+  const dialog = $("tryDialog"), status = $("tryStatus"), canvas = $("tryCanvas"), ctx = canvas.getContext("2d");
+  const tryState = { id: null, photo: null, mask: null, points: [], labels: [], label: 1, seq: 0, stream: null };
+
+  function say(text, error) { status.textContent = text; status.classList.toggle("err", !!error); }
+  function show(...ids) {
+    for (const id of ["tryServer", "trySource", "tryVideoStage", "tryVideoControls", "tryPhotoStage", "tryPhotoControls"])
+      $(id).hidden = !ids.includes(id);
+  }
+  async function api(path, body) {
+    const response = await fetch(SERVER + path, body === undefined ? {} :
+      { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `Server error ${response.status}`);
+    return data;
+  }
+  async function serverUp() {
+    try {
+      const ctrl = new AbortController(); const t = setTimeout(() => ctrl.abort(), 1500);
+      const r = await fetch(SERVER + "/health", { signal: ctrl.signal }); clearTimeout(t);
+      return r.ok;
+    } catch { return false; }
+  }
+  async function openTry() {
+    if (!dialog.open) dialog.showModal();
+    say("Checking the macro server…");
+    if (await serverUp()) { show("trySource"); say("Upload a photo of an object, or take one with the camera."); }
+    else { show("tryServer"); say(""); }
+  }
+  function stopCamera() {
+    if (tryState.stream) { tryState.stream.getTracks().forEach(t => t.stop()); tryState.stream = null; }
+  }
+
+  async function usePhoto(dataUrl) {
+    stopCamera();
+    say("Sending the photo…");
+    try {
+      const photo = await api("/photo", { image: dataUrl });
+      const img = new Image(); img.src = dataUrl; await img.decode();
+      Object.assign(tryState, { id: photo.id, photo: img, mask: null, points: [], labels: [] });
+      canvas.width = photo.width; canvas.height = photo.height;
+      $("tryMeasure").disabled = true;
+      show("tryPhotoStage", "tryPhotoControls");
+      draw();
+      say("Click the object. Add − Background points (or right click) on the hand or table to cut them out.");
+    } catch (e) { show("trySource"); say(e.message, true); }
+  }
+
+  function draw() {
+    const { photo, mask, points, labels } = tryState;
+    ctx.drawImage(photo, 0, 0, canvas.width, canvas.height);
+    if (mask) ctx.drawImage(mask, 0, 0);
+    const r = Math.max(8, canvas.width / 130);
+    points.forEach(([x, y], i) => {
+      ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2);
+      ctx.fillStyle = labels[i] ? "#70d6a2" : "#e2261e"; ctx.fill();
+      ctx.lineWidth = r / 3; ctx.strokeStyle = "#000"; ctx.stroke();
+      ctx.fillStyle = "#000"; ctx.font = `700 ${r * 1.6}px sans-serif`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(labels[i] ? "+" : "−", x, y + r * 0.08);
+    });
+  }
+
+  async function maskOverlay(dataUrl) {
+    const img = new Image(); img.src = dataUrl; await img.decode();
+    const c = document.createElement("canvas"); c.width = canvas.width; c.height = canvas.height;
+    const g = c.getContext("2d"); g.drawImage(img, 0, 0, c.width, c.height);
+    const d = g.getImageData(0, 0, c.width, c.height), p = d.data;
+    for (let i = 0; i < p.length; i += 4) {
+      if (p[i] > 127) { p[i] = 168; p[i + 1] = 136; p[i + 2] = 245; p[i + 3] = 46; }
+      else { p[i] = 0; p[i + 1] = 0; p[i + 2] = 0; p[i + 3] = 150; }
+    }
+    g.putImageData(d, 0, 0);
+    return c;
+  }
+
+  async function addPoint(e, label) {
+    if (!tryState.id) return;
+    const rect = canvas.getBoundingClientRect();
+    const x = Math.round((e.clientX - rect.left) / rect.width * canvas.width);
+    const y = Math.round((e.clientY - rect.top) / rect.height * canvas.height);
+    tryState.points.push([x, y]); tryState.labels.push(label);
+    draw();
+    if (!tryState.labels.includes(1)) { say("Now click the object itself (+ Object)."); return; }
+    const seq = ++tryState.seq;
+    $("tryMeasure").disabled = true;
+    say("Segmenting with SAM… (the first time it loads the model, a few seconds)");
+    try {
+      const { mask } = await api("/segment", { id: tryState.id, points: tryState.points, labels: tryState.labels });
+      if (seq !== tryState.seq) return;
+      tryState.mask = await maskOverlay(mask);
+      draw();
+      $("tryMeasure").disabled = false;
+      say("Mask ready. Add points to refine it, or press Measure macros.");
+    } catch (err) { if (seq === tryState.seq) say(err.message, true); }
+  }
+
+  canvas.addEventListener("click", e => addPoint(e, tryState.label));
+  canvas.addEventListener("contextmenu", e => { e.preventDefault(); addPoint(e, 0); });
+  const setMode = label => {
+    tryState.label = label;
+    $("modeObject").setAttribute("aria-pressed", String(label === 1));
+    $("modeBackground").setAttribute("aria-pressed", String(label === 0));
+  };
+  $("modeObject").addEventListener("click", () => setMode(1));
+  $("modeBackground").addEventListener("click", () => setMode(0));
+  $("tryClear").addEventListener("click", () => {
+    tryState.seq++; Object.assign(tryState, { points: [], labels: [], mask: null });
+    $("tryMeasure").disabled = true; draw(); say("Points cleared. Click the object.");
+  });
+  $("tryAgain").addEventListener("click", () => { tryState.seq++; show("trySource"); say("Upload a photo, or use the camera."); });
+
+  $("tryFile").addEventListener("change", e => {
+    const file = e.target.files[0]; e.target.value = "";
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => usePhoto(reader.result);
+    reader.onerror = () => say("The file could not be read.", true);
+    reader.readAsDataURL(file);
+  });
+
+  $("tryCamera").addEventListener("click", async () => {
+    try {
+      tryState.stream = await navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1920 }, height: { ideal: 1080 } }, audio: false });
+      const video = $("tryVideo"); video.srcObject = tryState.stream; await video.play();
+      show("tryVideoStage", "tryVideoControls");
+      say("Frame the object, then Take photo.");
+    } catch (e) {
+      say("The camera is not available here. Open the page from http://127.0.0.1:8765, allow the camera, or upload a photo instead.", true);
+    }
+  });
+  $("tryShoot").addEventListener("click", () => {
+    const video = $("tryVideo"), c = document.createElement("canvas");
+    c.width = video.videoWidth; c.height = video.videoHeight;
+    c.getContext("2d").drawImage(video, 0, 0);
+    usePhoto(c.toDataURL("image/jpeg", 0.92));
+  });
+  $("tryVideoCancel").addEventListener("click", () => { stopCamera(); show("trySource"); say("Upload a photo, or use the camera."); });
+
+  $("tryMeasure").addEventListener("click", async () => {
+    $("tryMeasure").disabled = true;
+    say("Measuring the six macros…");
+    try {
+      const { macros } = await api("/measure", { id: tryState.id });
+      const mine = { name: "your object", ...macros };
+      let entry = chipEls.find(([o]) => o.name === "your object");
+      if (entry) { Object.assign(entry[0], mine); }
+      else {
+        const b = el("button", "chip", "★ your object");
+        b.type = "button"; b.setAttribute("aria-pressed", "false");
+        entry = [mine, b];
+        b.addEventListener("click", () => loadObject(entry[0]));
+        chips.prepend(b); chipEls.unshift(entry);
+      }
+      dialog.close();
+      loadObject(entry[0]);
+      window.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+    } catch (e) { say(e.message, true); $("tryMeasure").disabled = false; }
+  });
+
+  $("tryRetry").addEventListener("click", openTry);
+  $("tryCopy").addEventListener("click", async () => {
+    try { await navigator.clipboard.writeText(".venv/bin/python CV/macro_server.py"); say("Command copied."); }
+    catch { say("Select the command and copy it."); }
+  });
+  $("tryClose").addEventListener("click", () => dialog.close());
+  dialog.addEventListener("close", () => { stopCamera(); tryState.seq++; });
+  $("tryButton").addEventListener("click", openTry);
+
+  const start = OBJECTS[0];
+  for (const m of MACROS) state[m.key] = start[m.key];
+  active = start; markChips(); renderAll();
+})();
+</script>
+</body>
+</html>

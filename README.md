@@ -104,6 +104,19 @@ cd CV
 
 and open the preset with **OPEN PRESET**.
 
+## Macro map
+
+`docs/macro-map.html` shows how each macro is measured and which synth parameters it
+turns; open it in any browser. Its **TRY YOUR OWN!** lens measures your own photo with
+the same SAM and macro code as the pipeline, through a small local server:
+
+```bash
+.venv/bin/python CV/macro_server.py
+```
+
+Then open <http://127.0.0.1:8765> (the camera works there in every browser), press the
+lens, upload a photo or take one, click the object and press **Measure macros**.
+
 ## Troubleshooting
 
 | Message | Fix |
