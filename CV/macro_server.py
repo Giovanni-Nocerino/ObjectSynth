@@ -15,6 +15,7 @@ Endpoints (JSON in, JSON out):
   POST /photo   {"image": <data URL>}            -> {"id", "width", "height"}
   POST /segment {"id", "points", "labels"}       -> {"mask": <PNG data URL>}
   POST /measure {"id"}                           -> {"macros": {...}}
+  POST /wavetable {"id"}                         -> wavetable_story.story_data
 Points are pixels of the photo as returned by /photo (long side 1920, like
 the camera captures); labels are 1 for the object, 0 for the background.
 """
@@ -31,6 +32,7 @@ import cv2
 import numpy as np
 
 import macros
+import wavetable_story
 from recognition import load_model, segment
 
 PAGE_PATH = macros.CV_DIRECTORY.parent / "docs" / "macro-map.html"
@@ -92,21 +94,30 @@ def segment_photo(body):
     return {"mask": "data:image/png;base64," + base64.b64encode(png.tobytes()).decode()}
 
 
-def measure_photo(body):
+def with_photo_files(body, function):
+    """The CV code reads files, like the pipeline: write the pair to a temp folder."""
     photo = get_photo(body)
     if photo["mask"] is None:
         raise ValueError("Segment the object first.")
-    # macros reads files, like the pipeline: write the pair to a temp folder.
     with tempfile.TemporaryDirectory() as folder:
         image_path = Path(folder) / "photo.png"
         mask_path = Path(folder) / "photo_mask.png"
         cv2.imwrite(str(image_path), photo["image"])
         cv2.imwrite(str(mask_path), photo["mask"])
-        values = macros.all_macros(image_path, mask_path)
-    return {"macros": values}
+        return function(image_path, mask_path)
 
 
-ROUTES = {"/photo": add_photo, "/segment": segment_photo, "/measure": measure_photo}
+def measure_photo(body):
+    return {"macros": with_photo_files(body, macros.all_macros)}
+
+
+def wavetable_photo(body):
+    return with_photo_files(
+        body, lambda image, mask: wavetable_story.story_data(image, mask, "your object"))
+
+
+ROUTES = {"/photo": add_photo, "/segment": segment_photo, "/measure": measure_photo,
+          "/wavetable": wavetable_photo}
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -130,11 +141,12 @@ class Handler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
-        if self.path in ("/", "/index.html") and PAGE_PATH.is_file():
+        if self.path.split("?")[0] in ("/", "/index.html") and PAGE_PATH.is_file():
             data = PAGE_PATH.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(data)))
+            self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             self.wfile.write(data)
         elif self.path == "/health":
