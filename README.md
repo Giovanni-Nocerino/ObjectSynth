@@ -1,4 +1,4 @@
-# PlayAnyThing
+# ObjectSynth
 
 Photograph an object, turn its shape into a wavetable synth sound.
 
