@@ -12,6 +12,10 @@
 
 CV/datasets/
 
-# Camera presets and their names stay on each computer
+# Camera captures, masks, waveforms, presets and their names stay on each computer
+CV/captures/
+CV/masks/
+CV/waveforms/
 CV/presets/
+camera-acquired-presets/
 CV/object_names.json
