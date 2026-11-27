@@ -11,7 +11,7 @@
 \usepackage{graphicx}
 \usepackage{float}
 \usepackage[font=small,labelfont=bf]{caption}
-\title{\vspace{-2.4em}\textbf{ObjectSynth} --- What Does This Object Sound Like?}
+\title{\vspace{-2.4em}\textbf{ObjectSynth}: What Does This Object Sound Like?}
 \author{Giovanni Nocerino \and Giacomo Cordella}
 \date{\vspace{-0.8em}Software Engineering, November 2026}
 
@@ -27,7 +27,7 @@ Splitting the project in two came naturally: \emph{Image Processing} turns what 
 \section*{Image Processing}
 Once SAM 2.1 hands us a clean binary mask of the main object in view, we had to solve two core musical problems: extracting a \textbf{waveform} to define the raw timbre, and picking \textbf{effects} that give that timbre character, possibly following natural intuition.
 
-\textbf{Waveform Extraction.} A waveform is a 1D array of amplitude values repeated cycle after cycle---the sonic fingerprint of the sound. Starting from the photo inside SAM's 2D mask, the most direct way to get a 1D wave was to collapse one axis into the other. For a clean, readable first pass, we averaged the brightness along each column to build the cycle index by index.
+\textbf{Waveform Extraction.} A waveform is a 1D array of amplitude values repeated cycle after cycle, the sonic fingerprint of the sound. Starting from the photo inside SAM's 2D mask, the most direct way to get a 1D wave was to collapse one axis into the other. For a clean, readable first pass, we averaged the brightness along each column to build the cycle index by index.
 
 \textbf{Effect Application.} OS has many parameters, and wiring image extracted features to each one of them, keeping a reasonable relation between look and sound, was not the right path. Instead, we measure six visual traits anyone can spot at a glance: sharpness (Harris corner detector), brightness (CIELAB lightness), body (share of the frame), asymmetry (overlap with a mirrored version), texture (Canny edge detector), and colourfulness (CIELAB chroma). Each trait nudges a small cluster of musically related controls with different scaling (Figure~\ref{fig:macro}). Sharp edges bite and attack fast, bright objects open up, big ones stretch wide and long, and colourful ones shimmer. A nice visualization is documented in \texttt{docs/explorer.html} inside the repository.
 
@@ -52,7 +52,7 @@ sudden jump is heard as a click.
 
 \section*{Interesting Problems We Encountered}
 
-\textbf{Wavetable.} Turning images into sound involves some arbitrary choices. During the experimental phase we liked two waveform extraction methods, so we decided to keep both. Inspired by Serum's (a popular synth) wavetable position control---which slices through a 3D surface of waves---we interpolated between the two waveforms so the player can sweep to whatever sweet spot fits the track (Figure~\ref{fig:wavetable}).
+\textbf{Wavetable.} Turning images into sound involves some arbitrary choices. During the experimental phase we liked two waveform extraction methods, so we decided to keep both. Inspired by Serum's (a popular synth) wavetable position control, which slices through a 3D surface of waves, we interpolated between the two waveforms so the player can sweep to whatever sweet spot fits the track (Figure~\ref{fig:wavetable}).
 
 \begin{figure}[h]
   \centering
@@ -64,11 +64,11 @@ sudden jump is heard as a click.
   \vspace{-0.3em}
 \end{figure}
 
-\textbf{The LFO and the Host.} A DAW requests audio in blocks whose size the host controls. Early on, we updated the LFO once per block, which turned fast sweeps into stair-stepped jumps on large buffers and made the same project sound inconsistent across hidden host settings. Counting elapsed time in samples fixed that: the LFO now steps at a consistent rate regardless of buffer size. That fix also surfaced a subtler bug---notes triggering early or repeatedly---which we caught by enforcing a straightforward invariant: a chord played together must match the sum of its notes played one by one.
+\textbf{The LFO and the Host.} A DAW requests audio in blocks whose size the host controls. Early on, we updated the LFO once per block, which turned fast sweeps into stair-stepped jumps on large buffers and made the same project sound inconsistent across hidden host settings. Counting elapsed time in samples fixed that: the LFO now steps at a consistent rate regardless of buffer size. That fix also surfaced a subtler bug (notes triggering early or repeatedly), which we caught by enforcing a straightforward invariant: a chord played together must match the sum of its notes played one by one.
 
 \textbf{The Nyquist Frequency.} Early prototypes overlooked a classic digital audio trap: frequencies above half the sample rate cannot be represented cleanly. High notes started sounding rough and slightly out of tune; checking the pitch revealed upper harmonics crossing Nyquist and folding back as aliasing. Now each waveform stores band-limited versions with fewer harmonics, and every voice plays the version that is safe for its pitch.
 
-\textbf{Limitations.} Mapping pixels to sound will always be a creative design choice rather than ground truth---two sound designers would wire the same object differently. Lighting, cluttered backgrounds, and mask accuracy also still affect the result more than we would like.
+\textbf{Limitations.} Mapping pixels to sound will always be a creative design choice rather than ground truth: two sound designers would wire the same object differently. Lighting, cluttered backgrounds, and mask accuracy also still affect the result more than we would like.
 
 
 \begin{figure}[H]
