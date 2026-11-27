@@ -469,9 +469,6 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
         <button class="btn primary" type="button" id="wtMorphPlay">▶ Play</button>
       </div>
     </section>
-    <footer>Same code as the presets: <code>CV/waveforom_extraction.py</code> (profile, rings) and <code>CV/to_wav.py</code>
-      (frames). The pictures are made by <code>CV/wavetable_story.py</code>; the pixel grid is coarser than the real
-      photo so each pixel can be seen.</footer>
   </div>
 
   <div class="page" id="page-effects" role="tabpanel" aria-labelledby="tab-effects" hidden>
@@ -496,19 +493,11 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
     </div>
     <p class="fx-empty" id="fxEmpty">Click an effect's name in the toolbar to open its controls; the dot switches it on and off.</p>
     <div class="fx-mods" id="fxMods"></div>
-    <footer>Same algorithms and parameters as the plugin, rebuilt with Web Audio: linear ADSR and equal-power unison
-      (<code>SynthVoice</code>, <code>LiveADSR</code>), 2-pole low-passes (<code>FilterBank</code>), tanh clipper with 0–36 dB of
-      drive, RMS make-up and 4× oversampling (<code>Saturator</code>), stereo chorus with the right LFO 90° ahead
-      (<code>StereoChorus</code>), LFO synced at 120 BPM. Settings come from the macros through the same mapping as
-      <code>CV/macro_mapping.py</code>. Not yet compared sample by sample with the plugin's output.</footer>
   </div>
 
   <div class="page" id="page-macros" role="tabpanel" aria-labelledby="tab-macros" hidden>
   <main id="plates" style="display:grid;gap:22px"></main>
 
-  <footer>Measurements and their ranges come from <code>CV/macros.py</code> (<code>MACRO_RANGES</code>); curves and
-    thresholds from <code>CV/macro_mapping.py</code>. The objects are dataset photos, the same ones as the presets in <code>dataset-presets/</code>.
-    Parameters a macro does not touch keep the synth's init values.</footer>
   </div>
 </div>
 
