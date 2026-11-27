@@ -15,7 +15,7 @@ import os
 from pathlib import Path
 
 from acquisition import capture_image
-from make_presets import make_preset, set_object_name
+from make_presets import CAMERA_PRESET_DIRECTORY, make_preset, set_object_name
 from recognition import segment_image
 from to_wav import export_wavetable
 from waveforom_extraction import extract_wavetable_features
@@ -55,7 +55,7 @@ def run():
     try:
         image_path, mask_path = Path(image_path), Path(mask_path)
         ask_object_name(image_path.stem)
-        preset_path, values, _ = make_preset(image_path, mask_path)
+        preset_path, values, _ = make_preset(image_path, mask_path, CAMERA_PRESET_DIRECTORY)
     except (FileNotFoundError, ValueError, OSError) as error:
         raise RuntimeError(f"Preset export failed: {error}") from error
 

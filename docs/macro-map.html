@@ -272,7 +272,7 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
     <h1>Macro map</h1>
     <p class="lede">Every preset starts as a photo and the object's SAM mask. Six measurements are taken, each is
       mapped to 0–1 with a fixed range, and each macro then turns its own synth parameters. Turn a macro knob
-      (drag, scroll or arrow keys) and watch what follows, or load one of the objects we photographed.</p>
+      (drag, scroll or arrow keys) and watch what follows, or load one of the example objects.</p>
     <div class="chain"><span>photo + SAM mask</span><b>→</b><span>measurement</span><b>→</b><span>fixed range → 0–1</span><b>→</b><span>macro</span><b>→</b><span>synth parameters</span></div>
   </header>
 
@@ -284,7 +284,7 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
   <main id="plates" style="display:grid;gap:22px"></main>
 
   <footer>Measurements and their ranges come from <code>CV/macros.py</code> (<code>MACRO_RANGES</code>); curves and
-    thresholds from <code>CV/macro_mapping.py</code>. Object values are the camera presets in <code>CV/presets</code>.
+    thresholds from <code>CV/macro_mapping.py</code>. The objects are dataset photos, the same ones as the presets in <code>dataset-presets/</code>.
     Parameters a macro does not touch keep the synth's init values.</footer>
 </div>
 
@@ -460,36 +460,36 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
   ];
 
   const OBJECTS = [
-    {"name":"chiave_2","sharpness":0.776,"brightness":0.957,"body":0.212,"asymmetry":0.301,"texture":0.252,"colorfulness":0.343},
-    {"name":"chiave_1","sharpness":0.558,"brightness":0.667,"body":0.085,"asymmetry":0.189,"texture":0.189,"colorfulness":0.181},
-    {"name":"coltello","sharpness":0.619,"brightness":1.0,"body":0.154,"asymmetry":0.15,"texture":0.008,"colorfulness":0.406},
-    {"name":"matita","sharpness":0.485,"brightness":0.045,"body":0.036,"asymmetry":0.0,"texture":0.768,"colorfulness":0.076},
-    {"name":"mano_1","sharpness":0.733,"brightness":0.77,"body":0.833,"asymmetry":0.351,"texture":0.0,"colorfulness":0.609},
-    {"name":"mano_2","sharpness":0.102,"brightness":0.956,"body":0.428,"asymmetry":0.433,"texture":0.0,"colorfulness":0.579},
-    {"name":"mano_3","sharpness":0.177,"brightness":1.0,"body":0.467,"asymmetry":0.42,"texture":0.0,"colorfulness":0.614},
-    {"name":"melità","sharpness":0.463,"brightness":0.234,"body":0.562,"asymmetry":0.189,"texture":0.04,"colorfulness":0.524},
-    {"name":"umbrella","sharpness":0.532,"brightness":0.209,"body":0.399,"asymmetry":0.002,"texture":0.086,"colorfulness":0.104},
-    {"name":"TAG Vancouver","sharpness":0.347,"brightness":0.458,"body":0.098,"asymmetry":0.0,"texture":0.047,"colorfulness":1.0},
-    {"name":"milkpro","sharpness":0.368,"brightness":0.887,"body":0.352,"asymmetry":0.0,"texture":0.559,"colorfulness":0.836},
-    {"name":"barattolo","sharpness":0.371,"brightness":0.857,"body":0.355,"asymmetry":0.37,"texture":0.006,"colorfulness":0.691},
-    {"name":"cucchiaio","sharpness":0.282,"brightness":1.0,"body":0.139,"asymmetry":0.0,"texture":0.0,"colorfulness":0.267},
-    {"name":"lemon","sharpness":0.213,"brightness":1.0,"body":0.053,"asymmetry":0.078,"texture":0.071,"colorfulness":1.0},
-    {"name":"lemon big","sharpness":0.013,"brightness":1.0,"body":0.33,"asymmetry":0.115,"texture":0.015,"colorfulness":1.0},
-    {"name":"pam cheese","sharpness":0.15,"brightness":1.0,"body":0.648,"asymmetry":0.016,"texture":0.144,"colorfulness":0.555},
-    {"name":"julia","sharpness":0.197,"brightness":0.303,"body":0.833,"asymmetry":0.312,"texture":0.04,"colorfulness":0.497},
-    {"name":"giovanni","sharpness":0.0,"brightness":0.15,"body":0.9,"asymmetry":0.384,"texture":0.018,"colorfulness":0.207},
-    {"name":"spartito_1","sharpness":0.0,"brightness":0.921,"body":0.895,"asymmetry":0.0,"texture":1.0,"colorfulness":0.029},
-    {"name":"spartito_2","sharpness":0.0,"brightness":0.727,"body":1.0,"asymmetry":0.019,"texture":0.985,"colorfulness":0.051},
-    {"name":"cellujack","sharpness":0.0,"brightness":0.544,"body":0.518,"asymmetry":0.0,"texture":1.0,"colorfulness":0.176},
-    {"name":"tessera_1","sharpness":0.0,"brightness":0.556,"body":0.334,"asymmetry":0.0,"texture":0.293,"colorfulness":0.192},
-    {"name":"tessera_2","sharpness":0.046,"brightness":0.736,"body":0.474,"asymmetry":0.0,"texture":0.287,"colorfulness":0.049},
-    {"name":"tazzina","sharpness":0.0,"brightness":1.0,"body":0.188,"asymmetry":0.027,"texture":0.0,"colorfulness":0.309},
-    {"name":"tazza","sharpness":0.0,"brightness":0.796,"body":0.262,"asymmetry":0.184,"texture":0.0,"colorfulness":0.178},
-    {"name":"glas","sharpness":0.068,"brightness":0.799,"body":0.329,"asymmetry":0.0,"texture":0.143,"colorfulness":0.369},
-    {"name":"telecomando","sharpness":0.02,"brightness":1.0,"body":0.416,"asymmetry":0.0,"texture":0.0,"colorfulness":0.004},
-    {"name":"cuffie","sharpness":0.079,"brightness":0.0,"body":0.418,"asymmetry":0.318,"texture":0.0,"colorfulness":0.103},
-    {"name":"cuffie2","sharpness":0.0,"brightness":1.0,"body":0.856,"asymmetry":0.0,"texture":0.0,"colorfulness":0.0},
-    {"name":"cuffiejack","sharpness":0.0,"brightness":1.0,"body":0.144,"asymmetry":0.0,"texture":0.0,"colorfulness":0.085}
+    {"name": "Umbrella", "sharpness": 0.851, "brightness": 0.96, "body": 0.373, "asymmetry": 0.189, "texture": 0.283, "colorfulness": 1.0},
+    {"name": "Axe", "sharpness": 0.421, "brightness": 0.453, "body": 0.277, "asymmetry": 0.793, "texture": 0.007, "colorfulness": 0.321},
+    {"name": "Cage", "sharpness": 0.055, "brightness": 1.0, "body": 0.777, "asymmetry": 0.707, "texture": 0.505, "colorfulness": 0.172},
+    {"name": "Car", "sharpness": 0.182, "brightness": 0.476, "body": 1.0, "asymmetry": 0.181, "texture": 0.29, "colorfulness": 0.492},
+    {"name": "CeilingLamp", "sharpness": 0.982, "brightness": 0.755, "body": 0.629, "asymmetry": 0.84, "texture": 0.573, "colorfulness": 0.315},
+    {"name": "Desk", "sharpness": 0.787, "brightness": 0.134, "body": 1.0, "asymmetry": 0.333, "texture": 0.022, "colorfulness": 0.306},
+    {"name": "Diagram", "sharpness": 0.0, "brightness": 1.0, "body": 0.18, "asymmetry": 1.0, "texture": 0.0, "colorfulness": 0.01},
+    {"name": "Fencing", "sharpness": 0.902, "brightness": 1.0, "body": 0.406, "asymmetry": 0.772, "texture": 0.143, "colorfulness": 0.237},
+    {"name": "FerrisWheel", "sharpness": 0.849, "brightness": 0.986, "body": 0.592, "asymmetry": 0.901, "texture": 1.0, "colorfulness": 0.354},
+    {"name": "GasStation", "sharpness": 0.397, "brightness": 0.287, "body": 0.842, "asymmetry": 0.35, "texture": 0.56, "colorfulness": 0.361},
+    {"name": "Handrail", "sharpness": 1.0, "brightness": 0.475, "body": 0.236, "asymmetry": 1.0, "texture": 0.317, "colorfulness": 0.469},
+    {"name": "Jewelry", "sharpness": 0.91, "brightness": 0.516, "body": 0.508, "asymmetry": 0.956, "texture": 0.905, "colorfulness": 0.185},
+    {"name": "Key", "sharpness": 0.581, "brightness": 0.912, "body": 0.289, "asymmetry": 0.901, "texture": 0.505, "colorfulness": 1.0},
+    {"name": "Kitchenware", "sharpness": 0.524, "brightness": 1.0, "body": 0.192, "asymmetry": 0.0, "texture": 0.0, "colorfulness": 0.123},
+    {"name": "Ladder", "sharpness": 0.558, "brightness": 0.5, "body": 0.163, "asymmetry": 0.929, "texture": 0.083, "colorfulness": 0.404},
+    {"name": "Missile", "sharpness": 0.596, "brightness": 0.603, "body": 1.0, "asymmetry": 0.289, "texture": 0.448, "colorfulness": 0.052},
+    {"name": "Motorcycle", "sharpness": 0.875, "brightness": 0.1, "body": 0.693, "asymmetry": 0.484, "texture": 0.279, "colorfulness": 0.0},
+    {"name": "Mower", "sharpness": 0.477, "brightness": 0.52, "body": 0.305, "asymmetry": 0.839, "texture": 0.597, "colorfulness": 0.525},
+    {"name": "Parachute", "sharpness": 0.729, "brightness": 0.274, "body": 0.258, "asymmetry": 0.676, "texture": 0.528, "colorfulness": 0.526},
+    {"name": "Piano", "sharpness": 1.0, "brightness": 0.091, "body": 0.957, "asymmetry": 0.332, "texture": 0.031, "colorfulness": 0.447},
+    {"name": "Rack", "sharpness": 0.682, "brightness": 0.322, "body": 0.843, "asymmetry": 0.322, "texture": 0.646, "colorfulness": 0.527},
+    {"name": "Spider", "sharpness": 0.601, "brightness": 0.289, "body": 0.327, "asymmetry": 0.915, "texture": 0.0, "colorfulness": 0.308},
+    {"name": "Stethoscope", "sharpness": 0.315, "brightness": 0.358, "body": 0.267, "asymmetry": 0.979, "texture": 0.695, "colorfulness": 0.077},
+    {"name": "Teapot", "sharpness": 0.751, "brightness": 0.599, "body": 0.775, "asymmetry": 0.383, "texture": 0.443, "colorfulness": 0.441},
+    {"name": "TobaccoPipe", "sharpness": 0.366, "brightness": 0.698, "body": 0.272, "asymmetry": 0.0, "texture": 0.4, "colorfulness": 0.896},
+    {"name": "Toy", "sharpness": 1.0, "brightness": 0.31, "body": 0.87, "asymmetry": 0.686, "texture": 0.222, "colorfulness": 0.129},
+    {"name": "Tree", "sharpness": 0.543, "brightness": 0.858, "body": 0.188, "asymmetry": 1.0, "texture": 0.719, "colorfulness": 0.144},
+    {"name": "TV", "sharpness": 0.825, "brightness": 0.0, "body": 0.706, "asymmetry": 0.054, "texture": 0.001, "colorfulness": 0.035},
+    {"name": "UnevenBars", "sharpness": 0.804, "brightness": 0.828, "body": 0.253, "asymmetry": 1.0, "texture": 0.565, "colorfulness": 0.755},
+    {"name": "Windmill", "sharpness": 1.0, "brightness": 0.063, "body": 0.551, "asymmetry": 0.445, "texture": 0.254, "colorfulness": 0.382}
   ];
 
   const state = Object.fromEntries(MACROS.map(m => [m.key, 0.5]));

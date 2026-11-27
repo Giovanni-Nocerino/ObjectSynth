@@ -92,7 +92,7 @@ Press **FROM CAMERA** in the oscillator panel. A terminal window opens:
    **S** to keep the mask (**R** clears the points).
 3. Type the object's name in the terminal (Enter alone uses the photo's name).
 
-The preset is saved in `CV/presets/` and loaded into the synth. Errors are shown
+The preset is saved in `camera-acquired-presets/` and loaded into the synth. Errors are shown
 under the oscillator and in the terminal window.
 
 You can also run the pipeline without the plugin:

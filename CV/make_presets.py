@@ -28,7 +28,11 @@ from waveforom_extraction import (
 import numpy as np
 
 
+# Batch output of this script: local only (git-ignored).
 PRESET_DIRECTORY = macros.CV_DIRECTORY / "presets"
+# Presets taken with the camera (run_pipeline.py / the synth's camera button):
+# kept in git, at the repository root.
+CAMERA_PRESET_DIRECTORY = macros.CV_DIRECTORY.parent / "camera-acquired-presets"
 OBJECT_NAMES_PATH = macros.CV_DIRECTORY / "object_names.json"
 
 
@@ -121,13 +125,13 @@ def object_photo(image_path, mask_path):
     return jpeg.tobytes() if ok else None
 
 
-def make_preset(image_path, mask_path):
+def make_preset(image_path, mask_path, directory=PRESET_DIRECTORY):
     values = macros.all_macros(image_path, mask_path)
     parameters = preset_parameters(values)
     frames = wavetable_frames(image_path, mask_path)
     name = object_name(image_path.stem)
     path = write_preset(
-        PRESET_DIRECTORY / f"{name}.ospreset", parameters,
+        directory / f"{name}.ospreset", parameters,
         frames=frames, wavetable_name=name, frame_index=0,
         photo_jpeg=object_photo(image_path, mask_path), object_name=name,
     )
