@@ -106,14 +106,17 @@ and open the preset with **OPEN PRESET**.
 
 ## Explorer page
 
-`docs/macro-map.html` explains the pipeline in two tabs; open it in any browser:
+`docs/macro-map.html` explains the pipeline in three tabs; open it in any browser:
 - **Wavetable conversion** animates, step by step as you scroll, how a photo becomes the
   wavetable: the columns collapsing into a curve and its 64 harmonics, and the rings of the
   2D spectrum. A slider plays the 32 frames.
 - **Macro implementation** shows how each macro is measured and which synth parameters it turns.
+- **Effects** plays the object's wavetable through the synth's chain (same algorithms and
+  parameters, rebuilt with Web Audio) with the settings its macros chose, and shows each
+  module on an oscilloscope, a spectrum, a stereo field and an envelope trace.
 
 Its **TRY YOUR OWN!** lens runs your own photo through the same SAM, wavetable and macro
-code as the pipeline, and updates both tabs. It needs a small local server:
+code as the pipeline, and updates every tab. It needs a small local server:
 
 ```bash
 .venv/bin/python CV/macro_server.py

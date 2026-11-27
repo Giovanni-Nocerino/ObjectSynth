@@ -270,6 +270,61 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
 @media (max-width: 980px) { .wt-grid { grid-template-columns: 1fr; } }
 @media (max-width: 480px) { .wt-panel { padding: 12px; } .wt-cap h3 { font-size: 18px; } }
 
+/* ---------- effects ---------- */
+.wrap.wide { max-width: 1760px; }
+#page-effects { gap: 14px; font-size: 13px; }
+.fx-source { font-size: 12px; color: var(--muted); }
+.fx-source b { font-family: var(--mono); font-weight: 500; color: var(--lcd); }
+.fx-source span { color: var(--dim); }
+.fx-dock { display: grid; gap: 10px; padding-block: 8px; background: var(--body); z-index: 5; }
+@media (min-width: 900px) and (min-height: 640px) {
+  .fx-dock { position: sticky; top: 0; box-shadow: 0 10px 18px -12px rgba(0,0,0,0.8); }
+}
+.fx-views { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+.fx-view { padding: 10px; gap: 6px; border-radius: 8px; transition: box-shadow 0.3s, border-color 0.3s; }
+.fx-view.hot { border-color: var(--lcd); box-shadow: 0 0 0 1px var(--lcd), 0 10px 24px rgba(0,0,0,0.35); }
+.fx-view h3 { margin: 0; font: 600 15px/1.1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
+.fx-view p { margin: 2px 0 0; font-size: 11px; line-height: 1.35; color: var(--muted); }
+.fx-view canvas { width: 100%; height: clamp(110px, 17vh, 170px); display: block; background: var(--glass); border-radius: 6px; box-shadow: inset 0 0 0 1px #000; }
+.fx-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; padding: 8px 10px;
+  background: linear-gradient(180deg, var(--plate-hi), var(--plate)); border: 1px solid #000; border-radius: 8px; }
+.fx-transport { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; padding-right: 14px; border-right: 1px solid rgba(0,0,0,0.5); }
+.fx-transport .btn { padding: 7px 10px; font-size: 12.5px; }
+.fx-note { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.fx-note select { font: 500 12px/1 var(--mono); color: var(--ink); background: #1b1c20; border: 1px solid #000; border-radius: 6px; padding: 6px; }
+.fx-chips { display: flex; flex-wrap: wrap; gap: 6px; flex: 1 1 auto; }
+.fx-chip { display: inline-flex; align-items: stretch; border: 1px solid #000; border-radius: 6px; overflow: hidden; background: #1b1c20; }
+.fx-chip button { border: 0; background: none; color: var(--muted); cursor: pointer; font: 600 13px/1 var(--display); letter-spacing: 0.08em; text-transform: uppercase; }
+.fx-chip .power { width: 26px; display: grid; place-items: center; border-right: 1px solid #000; }
+.fx-chip .power i { width: 8px; height: 8px; border-radius: 50%; background: var(--dim); }
+.fx-chip .power[aria-pressed="true"] i { background: var(--lcd); box-shadow: 0 0 6px var(--lcd); }
+.fx-chip .name { padding: 7px 9px; }
+.fx-chip .name::after { content: " ▾"; color: var(--dim); }
+.fx-chip .name[aria-expanded="true"] { background: var(--ink); color: var(--glass); }
+.fx-chip .name[aria-expanded="true"]::after { content: " ▴"; color: inherit; }
+.fx-chip.on .name { color: var(--ink); }
+.fx-chip.on .name[aria-expanded="true"] { color: var(--glass); }
+.fx-chip button:focus-visible, .fx-all:focus-visible { outline: 2px solid var(--lcd); outline-offset: -2px; }
+.fx-all { font: 500 12px/1 var(--mono); color: var(--muted); background: none; border: 1px solid var(--edge); border-radius: 6px; padding: 7px 9px; cursor: pointer; }
+.fx-empty { margin: 0; font-size: 12.5px; color: var(--dim); }
+.fx-mods { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; }
+.fx-mod { padding: 10px 12px; gap: 7px; align-content: start; border-radius: 8px; }
+.fx-mod.off .fx-row, .fx-mod.off .fx-curve { opacity: 0.45; }
+.fx-mod-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fx-mod-head h3 { margin: 0; font: 600 15px/1.1 var(--display); letter-spacing: 0.06em; text-transform: uppercase; }
+.fx-toggle { font: 600 11px/1 var(--mono); padding: 5px 7px; border-radius: 5px; border: 1px solid #000; cursor: pointer; background: #1b1c20; color: var(--dim); }
+.fx-toggle[aria-pressed="true"] { background: var(--lcd); color: var(--glass); }
+.fx-toggle:focus-visible { outline: 2px solid var(--lcd); outline-offset: 2px; }
+.fx-tip { margin: 0; font-size: 11.5px; line-height: 1.35; color: var(--muted); }
+.fx-row { display: grid; grid-template-columns: 1fr auto; gap: 0 8px; font-size: 12px; }
+.fx-row output { font-family: var(--mono); font-size: 11px; color: var(--lcd); }
+.fx-row input { grid-column: 1 / -1; width: 100%; margin: 2px 0 0; accent-color: var(--lcd); }
+.fx-curve { display: grid; gap: 3px; }
+.fx-curve canvas { width: 100%; height: 90px; background: var(--glass); border-radius: 6px; box-shadow: inset 0 0 0 1px #000; }
+.fx-curve span { font-family: var(--mono); font-size: 10.5px; color: var(--dim); }
+@media (max-width: 1150px) { .fx-views { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 560px) { .fx-views { grid-template-columns: 1fr; } .fx-transport { border-right: 0; padding-right: 0; } }
+
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
 }
@@ -313,6 +368,7 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
     <nav class="tabs" role="tablist" aria-label="Pages">
       <button type="button" role="tab" id="tab-wavetable" aria-controls="page-wavetable" aria-selected="true">Wavetable conversion</button>
       <button type="button" role="tab" id="tab-macros" aria-controls="page-macros" aria-selected="false" tabindex="-1">Macro implementation</button>
+      <button type="button" role="tab" id="tab-effects" aria-controls="page-effects" aria-selected="false" tabindex="-1">Effects</button>
     </nav>
     <div class="intro" data-page="wavetable">
       <h1>Wavetable conversion</h1>
@@ -327,6 +383,12 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
         mapped to 0–1 with a fixed range, and each macro then turns its own synth parameters. Turn a macro knob
         (drag, scroll or arrow keys) and watch what follows, or load one of the example objects.</p>
       <div class="chain"><span>photo + SAM mask</span><b>→</b><span>measurement</span><b>→</b><span>fixed range → 0–1</span><b>→</b><span>macro</span><b>→</b><span>synth parameters</span></div>
+    </div>
+    <div class="intro" data-page="effects" hidden>
+      <h1>Effects</h1>
+      <p class="lede">The object's wavetable through the synth's own chain, set by its macros. Hold a note, open an
+        effect from the toolbar and turn it: the instrument that shows it best lights up.</p>
+      <div class="chain"><span>wavetable frame</span><b>→</b><span>unison</span><b>→</b><span>voice filter + env</span><b>→</b><span>amp env</span><b>→</b><span>filter bank ← LFO</span><b>→</b><span>distortion</span><b>→</b><span>chorus</span></div>
     </div>
   </header>
 
@@ -374,6 +436,35 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
     <footer>Same code as the presets: <code>CV/waveforom_extraction.py</code> (profile, rings) and <code>CV/to_wav.py</code>
       (frames). The pictures are made by <code>CV/wavetable_story.py</code>; the pixel grid is coarser than the real
       photo so each pixel can be seen.</footer>
+  </div>
+
+  <div class="page" id="page-effects" role="tabpanel" aria-labelledby="tab-effects" hidden>
+    <div class="fx-source">Sound: <b id="fxWave">–</b> <span>(frame slider in Wavetable conversion)</span> · Settings: <b id="fxSeed">–</b></div>
+    <div class="fx-dock">
+      <div class="fx-views">
+      <section class="plate fx-view" data-view="scope"><div><h3>Oscilloscope</h3><p>Shape in time. Distortion squares it, filters round it, chorus makes it breathe.</p></div><canvas></canvas></section>
+      <section class="plate fx-view" data-view="spectrum"><div><h3>Spectrum</h3><p>Harmonics, low to high. Dashed: the low-pass curves.</p></div><canvas></canvas></section>
+      <section class="plate fx-view" data-view="stereo"><div><h3>Stereo field</h3><p>Left vs right. Mono is a line; spread and chorus open it.</p></div><canvas></canvas></section>
+      <section class="plate fx-view" data-view="env"><div><h3>Envelope</h3><p>Loudness over the last 4 s: ADSR and the LFO's pulse.</p></div><canvas></canvas></section>
+      </div>
+      <div class="fx-toolbar" role="toolbar" aria-label="Effects">
+        <div class="fx-transport">
+          <label class="fx-note">Note <select id="fxNote"><option value="65.41">C2</option><option value="130.81" selected>C3</option><option value="261.63">C4</option></select></label>
+          <button class="btn primary" type="button" id="fxHold" aria-pressed="false">▶ Hold note</button>
+          <button class="btn" type="button" id="fxPlay">Play note</button>
+          <button class="btn" type="button" id="fxReset">Reset to macros</button>
+        </div>
+        <div class="fx-chips" id="fxChips"></div>
+        <button class="fx-all" type="button" id="fxAll">Expand all</button>
+      </div>
+    </div>
+    <p class="fx-empty" id="fxEmpty">Click an effect's name in the toolbar to open its controls; the dot switches it on and off.</p>
+    <div class="fx-mods" id="fxMods"></div>
+    <footer>Same algorithms and parameters as the plugin, rebuilt with Web Audio: linear ADSR and equal-power unison
+      (<code>SynthVoice</code>, <code>LiveADSR</code>), 2-pole low-passes (<code>FilterBank</code>), tanh clipper with 0–36 dB of
+      drive, RMS make-up and 4× oversampling (<code>Saturator</code>), stereo chorus with the right LFO 90° ahead
+      (<code>StereoChorus</code>), LFO synced at 120 BPM. Settings come from the macros through the same mapping as
+      <code>CV/macro_mapping.py</code>. Not yet compared sample by sample with the plugin's output.</footer>
   </div>
 
   <div class="page" id="page-macros" role="tabpanel" aria-labelledby="tab-macros" hidden>
@@ -1100,12 +1191,13 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
   dialog.addEventListener("close", () => { stopCamera(); tryState.seq++; });
   $("tryButton").addEventListener("click", openTry);
 
-  const start = OBJECTS[0];
+  const start = OBJECTS.find(o => o.name === "Teapot") || OBJECTS[0];
+  window.objectSynthMacros = () => ({ ...state, name: active ? active.name : "" });
   for (const m of MACROS) state[m.key] = start[m.key];
   active = start; markChips(); renderAll();
 
   // ---------- tabs: Wavetable conversion / Macro implementation ----------
-  const tabs = [["wavetable", $("tab-wavetable")], ["macros", $("tab-macros")]];
+  const tabs = [["wavetable", $("tab-wavetable")], ["macros", $("tab-macros")], ["effects", $("tab-effects")]];
   function showPage(name, focus) {
     for (const [key, tab] of tabs) {
       const on = key === name;
@@ -1114,8 +1206,10 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
       document.querySelector(`.intro[data-page="${key}"]`).hidden = !on;
       if (on && focus) tab.focus();
     }
+    document.querySelector(".wrap").classList.toggle("wide", name === "effects");
     if (name === "macros") requestAnimationFrame(layoutLinks);
     if (location.hash !== "#" + name) history.replaceState(null, "", "#" + name);
+    window.dispatchEvent(new CustomEvent("pagechange", { detail: name }));
   }
   tabs.forEach(([key, tab], i) => {
     tab.addEventListener("click", () => showPage(key));
@@ -1124,7 +1218,7 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
       showPage(tabs[(i + (e.key === "ArrowRight" ? 1 : tabs.length - 1)) % tabs.length][0], true);
     });
   });
-  showPage(location.hash === "#macros" ? "macros" : "wavetable");
+  showPage(["#macros", "#effects"].includes(location.hash) ? location.hash.slice(1) : "wavetable");
 })();
 </script>
 <script>
@@ -1557,7 +1651,18 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
     out.textContent = `frame ${f}`;
     if (held) held.osc.setPeriodicWave(periodic(held.ac, mix(alpha)));
   }
-  slider.addEventListener("input", drawMorph);
+  slider.addEventListener("input", () => { drawMorph(); changed(); });
+  const changed = () => window.dispatchEvent(new Event("wavetablechange"));
+  // the selected frame as PeriodicWave coefficients, peak 0.95 like the preset frames (used by Effects)
+  function current() {
+    if (!D) return null;
+    const f = +slider.value, amps = mix(f / 31);
+    const s = amps.map((a, k) => a * D.dirS[k]), c = amps.map((a, k) => a * D.dirC[k]);
+    let m = 0; for (const v of wave(s, c, H, 2048)) m = Math.max(m, Math.abs(v));
+    const gain = m > 1e-9 ? 0.95 / m : 1, real = new Float32Array(H + 1), imag = new Float32Array(H + 1);
+    for (let k = 0; k < H; k++) { real[k + 1] = c[k] * gain; imag[k + 1] = s[k] * gain; }
+    return { name: D.mine ? "your object" : D.name, frame: f, real, imag };
+  }
   new ResizeObserver(drawMorph).observe(morphCanvas);
   playBtn.addEventListener("click", () => {
     if (held) {
@@ -1576,13 +1681,510 @@ dialog.try::backdrop { background: rgba(8,9,11,0.72); }
   const texture = new Panel(document.getElementById("wtTexture"), TEXTURE_STAGES, drawTexture, () => D.tex);
 
   function load(raw, mine) {
-    D = decode(raw);
+    D = decode(raw); D.mine = !!mine;
     document.getElementById("wtName").textContent = mine ? "★ your object" : raw.name;
     document.getElementById("wtSource").textContent = mine ? "your photo, through the same code as the presets." : "a dataset photo. Press TRY YOUR OWN! to use yours.";
-    shape.reset(); texture.reset(); drawMorph();
+    shape.reset(); texture.reset(); drawMorph(); changed();
   }
-  window.wavetableStory = { load };
+  window.wavetableStory = { load, current };
   load(JSON.parse(document.getElementById("wavetableExample").textContent));
+})();
+</script>
+<script>
+// ---------- Effects: the synth's voice + master chain rebuilt with Web Audio, with four views ----------
+// Same algorithms and parameters as ObjectSynth/Source (SynthVoice, FilterBank, Saturator, StereoChorus,
+// LiveADSR, TempoSync); see the note at the bottom of the tab.
+(() => {
+  const H = 64;
+  const $ = id => document.getElementById(id);
+  const clamp = (x, a, b) => Math.min(b, Math.max(a, x));
+  const css = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  const C = { lcd: css("--lcd"), ink: css("--ink"), dim: css("--dim"), edge: css("--edge"), muted: css("--muted"),
+    shape: css("--c-movement"), tex: css("--c-sharpness"), body: css("--c-body"), glass: css("--glass") };
+  const MONO = '11px "IBM Plex Mono", ui-monospace, Menlo, monospace';
+
+  // ---- plugin defaults (PluginProcessor.cpp createParameterLayout) ----
+  const INIT = {
+    attack: 0.005, decay: 0.1, sustain: 0.7, release: 0.1,
+    unisonEnabled: 0, unisonCount: 1, unisonDetune: 0, unisonSpread: 0.5,
+    filterEnvEnabled: 0, voiceFilterCutoff: 800, filterEnvAmount: 0,
+    filterBankEnabled: 0, lpCutoff: 18000, lpResonance: 0.7071,
+    lfoEnabled: 0, lfoSync: 6, lfoRoute1Depth: 0.5,
+    distortionEnabled: 0, distortionDrive: 3, distortionMix: 1,
+    chorusEnabled: 0, chorusRate: 0.8, chorusDepth: 0.3, chorusDelay: 7, chorusMix: 0.4,
+  };
+  const FILTER_ENV = { attack: 0.01, decay: 0.35, sustain: 0, release: 0.2 };  // filter ADSR defaults
+  const VOICE_LEVEL = 0.25, OUTPUT_GAIN = Math.pow(10, -6 / 20), BPM = 120;   // TempoSync::fallbackBpm
+  const DIVISIONS = [["4 bars", 16], ["2 bars", 8], ["1/1", 4], ["1/2", 2], ["1/2T", 4 / 3], ["1/4.", 1.5], ["1/4", 1],
+    ["1/4T", 2 / 3], ["1/8.", 0.75], ["1/8", 0.5], ["1/8T", 1 / 3], ["1/16.", 0.375], ["1/16", 0.25], ["1/16T", 1 / 6], ["1/32", 0.125]];
+
+  // ---- CV/macro_mapping.py ----
+  const linear = (m, a, b) => a + (b - a) * m, exponential = (m, a, b) => a * Math.pow(b / a, m);
+  const easeIn = (m, a, b, p = 3) => a + (b - a) * Math.pow(m, p), threshold = (m, at) => (m >= at ? 1 : 0);
+  const gatedLinear = (m, at, a, b, below = 0) => (m < at ? below : linear((m - at) / (1 - at), a, b));
+  const gatedEaseIn = (m, at, a, b, below = 0, p = 2) => (m < at ? below : easeIn((m - at) / (1 - at), a, b, p));
+  function fromMacros(m) {
+    const s = m.sharpness, b = m.brightness, c = m.body, steps = [2, 3, 6, 9, 12];
+    return { ...INIT,
+      distortionEnabled: threshold(s, 0.4), distortionDrive: gatedEaseIn(s, 0.4, 2, 10, 2),
+      attack: exponential(s, 0.05, 0.002), filterEnvEnabled: threshold(s, 0.3), filterEnvAmount: linear(s, 0, 3),
+      filterBankEnabled: 1, lpCutoff: exponential(b, 500, 18000), voiceFilterCutoff: exponential(b, 400, 4000),
+      unisonEnabled: threshold(c, 0.2), unisonCount: Math.round(linear(c, 1, 7)), unisonSpread: linear(c, 0.2, 1),
+      sustain: gatedLinear(c, 0.3, 0.4, 0.9), decay: exponential(c, 0.2, 1.2), release: exponential(c, 0.1, 1.5),
+      unisonDetune: linear(m.asymmetry, 3, 20),
+      lfoEnabled: threshold(m.texture, 0.2), lfoSync: steps[Math.min(Math.floor(m.texture * 5), 4)],
+      lfoRoute1Depth: linear(m.texture, 0.1, 0.6),
+      chorusEnabled: threshold(m.colorfulness, 0.5), chorusMix: easeIn(m.colorfulness, 0.08, 0.3),
+      chorusDepth: linear(m.colorfulness, 0.15, 0.45),
+    };
+  }
+  let P = { ...INIT }, seededFrom = "", dirty = false;
+
+  // ---- controls ----
+  const hz = v => (v >= 1000 ? (v / 1000).toFixed(v < 10000 ? 2 : 1) + " kHz" : v.toFixed(0) + " Hz");
+  const sec = v => (v < 1 ? (v * 1000).toFixed(v < 0.01 ? 1 : 0) + " ms" : v.toFixed(2) + " s");
+  const pct = v => Math.round(v * 100) + "%", num = v => v.toFixed(2);
+  const MODULES = [
+    { id: "amp", short: "Envelope", title: "Amplitude envelope", tip: "Volume over the note's life (linear ADSR, like LiveADSR).", views: ["env"],
+      sliders: [["attack", "Attack", 0.001, 2, "log", sec], ["decay", "Decay", 0.01, 5, "log", sec],
+        ["sustain", "Sustain", 0, 1, "lin", pct], ["release", "Release", 0.01, 5, "log", sec]] },
+    { id: "unison", short: "Unison", title: "Unison", toggle: "unisonEnabled", tip: "Copies of the oscillator, detuned and spread left–right.", views: ["stereo", "spectrum", "scope"],
+      sliders: [["unisonCount", "Voices", 1, 7, "int", v => String(v)], ["unisonDetune", "Detune", 0, 25, "lin", v => v.toFixed(1) + " ct"],
+        ["unisonSpread", "Spread", 0, 1, "lin", pct]] },
+    { id: "pluck", short: "Pluck filter", title: "Voice filter + envelope", toggle: "filterEnvEnabled", tip: "A low-pass per note that opens at note start and closes: the pluck.", views: ["spectrum"],
+      sliders: [["voiceFilterCutoff", "Cutoff", 20, 18000, "log", hz], ["filterEnvAmount", "Env amount", -4, 4, "lin", v => (v > 0 ? "+" : "") + v.toFixed(1) + " oct"]] },
+    { id: "bank", short: "Filter bank", title: "Filter bank · low-pass", toggle: "filterBankEnabled", tip: "The global tone: 2-pole low-pass on the mix.", views: ["spectrum", "scope"],
+      sliders: [["lpCutoff", "Cutoff", 20, 18000, "log", hz], ["lpResonance", "Resonance", 0.3, 5, "lin", num]] },
+    { id: "lfo", short: "LFO", title: "LFO → low-pass cutoff", toggle: "lfoEnabled", tip: "Sweeps the filter bank's cutoff, ±4 octaves at full depth, synced at 120 BPM.", views: ["spectrum"],
+      sliders: [["lfoSync", "Rate", 0, 14, "int", v => DIVISIONS[v][0]], ["lfoRoute1Depth", "Depth", -1, 1, "lin", num]] },
+    { id: "dist", short: "Distortion", title: "Distortion", toggle: "distortionEnabled", tip: "tanh soft clipper, 0–36 dB of drive, loudness kept equal.", views: ["scope", "spectrum"], curve: true,
+      sliders: [["distortionDrive", "Drive", 1, 10, "lin", num], ["distortionMix", "Mix", 0, 1, "lin", pct]] },
+    { id: "chorus", short: "Chorus", title: "Chorus", toggle: "chorusEnabled", tip: "A delay swept by an LFO, the right side 90° ahead of the left.", views: ["stereo", "scope"],
+      sliders: [["chorusRate", "Rate", 0.05, 5, "log", v => v.toFixed(2) + " Hz"], ["chorusDepth", "Depth", 0, 1, "lin", pct],
+        ["chorusDelay", "Centre delay", 1, 30, "lin", v => v.toFixed(1) + " ms"], ["chorusMix", "Mix", 0, 1, "lin", pct]] },
+  ];
+  const toPos = (v, lo, hi, scale) => (scale === "log" ? Math.log(v / lo) / Math.log(hi / lo) : (v - lo) / (hi - lo)) * 1000;
+  const fromPos = (p, lo, hi, scale) => (scale === "log" ? lo * Math.pow(hi / lo, p / 1000) : lo + (hi - lo) * p / 1000);
+
+  const mods = $("fxMods"), chipBar = $("fxChips"), inputs = {}, toggles = {}, cards = {}, names = {};
+  let curveCanvas = null, expanded;
+  try { expanded = new Set(JSON.parse(localStorage.getItem("fxExpanded") || "[]")); } catch (_) { expanded = new Set(); }
+  for (const mod of MODULES) {
+    const card = document.createElement("section"); card.className = "plate fx-mod"; card.dataset.views = mod.views.join(" ");
+    card.id = "fx-" + mod.id; cards[mod.id] = card;
+    // toolbar chip: power dot + name that opens the card
+    const chip = document.createElement("div"); chip.className = "fx-chip";
+    if (mod.toggle) {
+      const power = document.createElement("button"); power.type = "button"; power.className = "power";
+      power.setAttribute("aria-label", mod.title + " on/off"); power.innerHTML = "<i></i>";
+      power.addEventListener("click", () => set(mod.toggle, P[mod.toggle] ? 0 : 1, mod));
+      chip.appendChild(power);
+    } else chip.classList.add("on");
+    const name = document.createElement("button"); name.type = "button"; name.className = "name"; name.textContent = mod.short;
+    name.setAttribute("aria-controls", card.id);
+    name.addEventListener("click", () => expand(mod.id, !expanded.has(mod.id)));
+    chip.appendChild(name); chipBar.appendChild(chip); names[mod.id] = { name, chip };
+    const head = document.createElement("div"); head.className = "fx-mod-head";
+    head.innerHTML = `<h3>${mod.title}</h3>`;
+    if (mod.toggle) {
+      const b = document.createElement("button"); b.type = "button"; b.className = "fx-toggle";
+      b.addEventListener("click", () => { set(mod.toggle, P[mod.toggle] ? 0 : 1, mod); });
+      head.appendChild(b); toggles[mod.toggle] = { b, card, chip };
+    }
+    card.appendChild(head);
+    const tip = document.createElement("p"); tip.className = "fx-tip"; tip.textContent = mod.tip; card.appendChild(tip);
+    for (const [key, label, lo, hi, scale, fmt] of mod.sliders) {
+      const row = document.createElement("label"); row.className = "fx-row";
+      const name = document.createElement("span"); name.textContent = label;
+      const val = document.createElement("output");
+      const input = document.createElement("input"); input.type = "range";
+      if (scale === "int") { input.min = lo; input.max = hi; input.step = 1; } else { input.min = 0; input.max = 1000; input.step = 1; }
+      input.addEventListener("input", () => set(key, scale === "int" ? +input.value : fromPos(+input.value, lo, hi, scale), mod));
+      row.append(name, val, input); card.appendChild(row);
+      inputs[key] = { input, val, lo, hi, scale, fmt };
+    }
+    if (mod.curve) {
+      const wrap = document.createElement("div"); wrap.className = "fx-curve";
+      curveCanvas = document.createElement("canvas"); wrap.appendChild(curveCanvas);
+      const cap = document.createElement("span"); cap.textContent = "in → out of the clipper"; wrap.appendChild(cap);
+      card.appendChild(wrap);
+    }
+    mods.appendChild(card);
+  }
+  function showValues() {
+    for (const [key, c] of Object.entries(inputs)) {
+      c.input.value = c.scale === "int" ? P[key] : toPos(P[key], c.lo, c.hi, c.scale);
+      c.val.textContent = c.fmt(P[key]);
+    }
+    for (const [key, t] of Object.entries(toggles)) {
+      t.b.textContent = P[key] ? "ON" : "OFF"; t.b.setAttribute("aria-pressed", String(!!P[key]));
+      t.card.classList.toggle("off", !P[key]);
+      t.chip.classList.toggle("on", !!P[key]); t.chip.querySelector(".power").setAttribute("aria-pressed", String(!!P[key]));
+    }
+    drawCurve();
+  }
+  function set(key, value, mod) {
+    P[key] = value; dirty = true;
+    showValues(); engine.update(key);
+    if (mod) hot(mod.views);
+    $("fxSeed").textContent = seededFrom ? `${seededFrom}'s macros, edited` : "edited";
+  }
+  function expand(id, open) {
+    if (open) expanded.add(id); else expanded.delete(id);
+    layoutCards();
+    try { localStorage.setItem("fxExpanded", JSON.stringify([...expanded])); } catch (_) {}
+    if (open) { const c = cards[id]; requestAnimationFrame(() => { drawCurve(); c.scrollIntoView({ block: "nearest", behavior: "smooth" }); }); }
+  }
+  function layoutCards() {
+    for (const mod of MODULES) {
+      const open = expanded.has(mod.id);
+      cards[mod.id].hidden = !open; names[mod.id].name.setAttribute("aria-expanded", String(open));
+    }
+    $("fxEmpty").hidden = expanded.size > 0;
+    $("fxAll").textContent = expanded.size === MODULES.length ? "Collapse all" : "Expand all";
+  }
+  $("fxAll").addEventListener("click", () => {
+    const all = expanded.size === MODULES.length;
+    MODULES.forEach(m => (all ? expanded.delete(m.id) : expanded.add(m.id)));
+    expand(MODULES[0].id, !all);
+  });
+  layoutCards();
+  const viewCards = Object.fromEntries([...document.querySelectorAll(".fx-view")].map(v => [v.dataset.view, v]));
+  const hotTimers = {};
+  function hot(views) {
+    for (const v of views) {
+      viewCards[v].classList.add("hot"); clearTimeout(hotTimers[v]);
+      hotTimers[v] = setTimeout(() => viewCards[v].classList.remove("hot"), 1400);
+    }
+  }
+
+  // ---- distortion: Saturator.h ----
+  const driveGain = knob => Math.pow(10, (36 * (clamp(knob, 1, 10) - 1) / 9) / 20);
+  function makeUp(knob) {
+    const g = driveGain(knob); let i = 0, o = 0;
+    for (let k = 0; k < 512; k++) { const x = 0.18 * Math.sin(2 * Math.PI * k / 512), y = Math.tanh(g * x); i += x * x; o += y * y; }
+    return Math.sqrt(i / o);
+  }
+  function shaperCurve(knob) {
+    const n = 8193, g = driveGain(knob), m = makeUp(knob), c = new Float32Array(n);
+    for (let i = 0; i < n; i++) { const x = (i / (n - 1)) * 2 - 1; c[i] = Math.tanh(g * x) * m; }
+    return c;
+  }
+  function drawCurve() {
+    if (!curveCanvas) return;
+    const r = curveCanvas.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+    if (!r.width) return;
+    curveCanvas.width = r.width * dpr; curveCanvas.height = r.height * dpr;
+    const g = curveCanvas.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, r.width, r.height);
+    const w = r.width, h = r.height, R = 0.3, X = x => (x / R * 0.5 + 0.5) * w, Y = y => (0.5 - y / R * 0.5) * h;
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.moveTo(w / 2, 0); g.lineTo(w / 2, h); g.stroke();
+    g.setLineDash([3, 3]); g.beginPath(); g.moveTo(X(-R), Y(-R)); g.lineTo(X(R), Y(R)); g.stroke(); g.setLineDash([]);
+    const gain = driveGain(P.distortionDrive), m = makeUp(P.distortionDrive), wet = P.distortionEnabled ? P.distortionMix : 0;
+    g.strokeStyle = C.tex; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i <= 100; i++) { const x = -R + 2 * R * i / 100, y = (1 - wet) * x + wet * Math.tanh(gain * x) * m; i ? g.lineTo(X(x), Y(y)) : g.moveTo(X(x), Y(y)); }
+    g.stroke();
+  }
+
+  // ---- the audio engine ----
+  const noteHz = () => +$("fxNote").value;
+  const engine = {
+    ac: null, voice: null,
+    start() {
+      if (this.ac) { if (this.ac.state === "suspended") this.ac.resume(); return; }
+      const ac = this.ac = new (window.AudioContext || window.webkitAudioContext)();
+      const node = (n, props = {}) => Object.assign(n, props);
+      const gain = v => node(ac.createGain(), {}), G = v => { const g = ac.createGain(); g.gain.value = v; return g; };
+      // voices -> filter bank -> distortion -> chorus -> output
+      this.sum = G(1);
+      this.lp = ac.createBiquadFilter(); this.lp.type = "lowpass";
+      this.bankDry = G(1); this.bankWet = G(0); this.bankOut = G(1);
+      this.sum.connect(this.bankDry).connect(this.bankOut);
+      this.sum.connect(this.lp).connect(this.bankWet).connect(this.bankOut);
+      this.lfo = ac.createOscillator(); this.lfoGain = G(0); this.lfo.connect(this.lfoGain).connect(this.lp.detune);
+      this.shaper = ac.createWaveShaper(); this.shaper.oversample = "4x";
+      this.distDry = G(1); this.distWet = G(0); this.distOut = G(1);
+      this.bankOut.connect(this.distDry).connect(this.distOut);
+      this.bankOut.connect(this.shaper).connect(this.distWet).connect(this.distOut);
+      const split = ac.createChannelSplitter(2), merge = ac.createChannelMerger(2);
+      this.delayL = ac.createDelay(0.1); this.delayR = ac.createDelay(0.1);
+      this.chorusDry = G(1); this.chorusWet = G(0); this.chorusOut = G(1);
+      this.distOut.connect(this.chorusDry).connect(this.chorusOut);
+      this.distOut.connect(split); split.connect(this.delayL, 0); split.connect(this.delayR, 1);
+      this.delayL.connect(merge, 0, 0); this.delayR.connect(merge, 0, 1); merge.connect(this.chorusWet).connect(this.chorusOut);
+      // chorus LFOs: sin for the left, cos (90 degrees ahead) for the right, started together
+      this.cLfoL = ac.createOscillator();
+      this.cLfoR = ac.createOscillator();
+      this.cLfoR.setPeriodicWave(ac.createPeriodicWave(new Float32Array([0, 1]), new Float32Array([0, 0]), { disableNormalization: true }));
+      this.cGainL = G(0); this.cGainR = G(0);
+      this.cLfoL.connect(this.cGainL).connect(this.delayL.delayTime); this.cLfoR.connect(this.cGainR).connect(this.delayR.delayTime);
+      this.out = G(OUTPUT_GAIN); this.chorusOut.connect(this.out).connect(ac.destination);
+      // analysers: mono (L+R)/2 for scope / spectrum / envelope, L and R for the vectorscope
+      this.mono = node(ac.createAnalyser(), { fftSize: 8192, smoothingTimeConstant: 0.75, minDecibels: -110, maxDecibels: -10 });
+      this.out.connect(this.mono);
+      const s2 = ac.createChannelSplitter(2); this.out.connect(s2);
+      this.anL = node(ac.createAnalyser(), { fftSize: 2048 }); this.anR = node(ac.createAnalyser(), { fftSize: 2048 });
+      s2.connect(this.anL, 0); s2.connect(this.anR, 1);
+      const t = ac.currentTime + 0.02;
+      this.lfo.start(t); this.cLfoL.start(t); this.cLfoR.start(t); this.lfoStart = t; this.chorusStart = t;
+      for (const key of ["filterBankEnabled", "lfoEnabled", "distortionEnabled", "chorusEnabled"]) this.update(key, true);
+    },
+    ramp(param, v, now) { if (now) param.setValueAtTime(v, this.ac.currentTime); else param.setTargetAtTime(v, this.ac.currentTime, 0.01); },
+    update(key, now) {
+      if (!this.ac) return;
+      const k = key;
+      if (/^(filterBank|lpCutoff|lpResonance)/.test(k)) {
+        this.ramp(this.lp.frequency, P.lpCutoff, now); this.ramp(this.lp.Q, 20 * Math.log10(P.lpResonance), now);
+        this.ramp(this.bankWet.gain, P.filterBankEnabled ? 1 : 0, now); this.ramp(this.bankDry.gain, P.filterBankEnabled ? 0 : 1, now);
+      }
+      if (/^(lfo)/.test(k)) {
+        this.lfo.frequency.setValueAtTime((BPM / 60) / DIVISIONS[P.lfoSync][1], this.ac.currentTime);
+        this.ramp(this.lfoGain.gain, P.lfoEnabled ? 4 * 1200 * clamp(P.lfoRoute1Depth, -1, 1) : 0, now);
+      }
+      if (/^distortion/.test(k)) {
+        this.shaper.curve = shaperCurve(P.distortionDrive);
+        const wet = P.distortionEnabled ? P.distortionMix : 0;
+        this.ramp(this.distWet.gain, wet, now); this.ramp(this.distDry.gain, 1 - wet, now);
+      }
+      if (/^chorus/.test(k)) {
+        this.cLfoL.frequency.setValueAtTime(P.chorusRate, this.ac.currentTime); this.cLfoR.frequency.setValueAtTime(P.chorusRate, this.ac.currentTime);
+        const swing = 20 * 0.5 * P.chorusDepth / 1000, centre = P.chorusDelay / 1000;
+        for (const [d, g] of [[this.delayL, this.cGainL], [this.delayR, this.cGainR]]) { this.ramp(d.delayTime, centre, now); this.ramp(g.gain, swing, now); }
+        const wet = P.chorusEnabled ? P.chorusMix : 0;
+        this.ramp(this.chorusWet.gain, wet, now); this.ramp(this.chorusDry.gain, 1 - wet, now);
+      }
+      if (this.voice) this.voice.update(k);
+    },
+    wave() {
+      const w = window.wavetableStory && window.wavetableStory.current();
+      return this.ac.createPeriodicWave(w.real, w.imag, { disableNormalization: true });
+    },
+    noteOn() {
+      this.start();
+      if (this.voice) this.voice.stop(true);
+      this.voice = new Voice(this, noteHz());
+    },
+    noteOff() { if (this.voice) { this.voice.release(); this.voice = null; } },
+  };
+
+  class Voice {
+    constructor(e, f) {
+      const ac = e.ac, t = ac.currentTime + 0.005;
+      Object.assign(this, { e, ac, f, t0: t, oscs: [], released: null });
+      this.amp = ac.createGain(); this.amp.gain.value = 0; this.amp.connect(e.sum);
+      this.filter = ac.createBiquadFilter(); this.filter.type = "lowpass"; this.filter.Q.value = 20 * Math.log10(Math.SQRT1_2);
+      this.useFilter = !!P.filterEnvEnabled;
+      this.bus = ac.createGain();
+      if (this.useFilter) this.bus.connect(this.filter).connect(this.amp); else this.bus.connect(this.amp);
+      this.merge = ac.createChannelMerger(2); this.merge.connect(this.bus);
+      this.count = P.unisonEnabled ? P.unisonCount : 1;
+      this.bus.gain.value = VOICE_LEVEL / Math.sqrt(this.count);
+      const wave = e.wave();
+      for (let i = 0; i < this.count; i++) {
+        const o = ac.createOscillator(); o.setPeriodicWave(wave);
+        const l = ac.createGain(), r = ac.createGain();
+        o.connect(l).connect(this.merge, 0, 0); o.connect(r).connect(this.merge, 0, 1);
+        o.start(t); this.oscs.push({ o, l, r });
+      }
+      this.tune(true);
+      // amplitude ADSR (linear)
+      const g = this.amp.gain;
+      g.setValueAtTime(0, t); g.linearRampToValueAtTime(1, t + P.attack); g.linearRampToValueAtTime(P.sustain, t + P.attack + P.decay);
+      if (this.useFilter) this.filterEnvelope(t);
+    }
+    cutoffAt(env) { return clamp(P.voiceFilterCutoff * Math.pow(2, P.filterEnvAmount * env), 20, Math.min(18000, 0.45 * this.ac.sampleRate)); }
+    filterEnvelope(t) {
+      const fr = this.filter.frequency, E = FILTER_ENV;
+      fr.cancelScheduledValues(t); fr.setValueAtTime(this.cutoffAt(0), t);
+      fr.exponentialRampToValueAtTime(this.cutoffAt(1), t + E.attack);
+      fr.exponentialRampToValueAtTime(this.cutoffAt(E.sustain), t + E.attack + E.decay);
+    }
+    filterEnv(time) {   // filter envelope value at a time (for the spectrum overlay)
+      const E = FILTER_ENV, dt = time - this.t0;
+      if (dt < E.attack) return dt / E.attack;
+      if (dt < E.attack + E.decay) return 1 - (1 - E.sustain) * (dt - E.attack) / E.decay;
+      return E.sustain;
+    }
+    tune(now) {   // SynthVoice::applyUnison: detune and equal-power pan from the same -1..+1 position
+      this.oscs.forEach(({ o, l, r }, i) => {
+        const pos = this.count === 1 ? 0 : 2 * i / (this.count - 1) - 1;
+        const angle = (1 + pos * P.unisonSpread) * Math.PI / 4;
+        const set = (p, v) => (now ? p.setValueAtTime(v, this.ac.currentTime) : p.setTargetAtTime(v, this.ac.currentTime, 0.01));
+        set(o.frequency, this.f * Math.pow(2, pos * P.unisonDetune / 1200));
+        set(l.gain, Math.SQRT2 * Math.cos(angle)); set(r.gain, Math.SQRT2 * Math.sin(angle));
+      });
+    }
+    update(key) {
+      if (key === "unisonEnabled" || key === "unisonCount" || key === "filterEnvEnabled") { this.e.noteOn(); return; }
+      if (key === "unisonDetune" || key === "unisonSpread") this.tune(false);
+      if (key === "sustain" && !this.released) this.amp.gain.setTargetAtTime(P.sustain, this.ac.currentTime, 0.01);
+      if ((key === "voiceFilterCutoff" || key === "filterEnvAmount") && this.useFilter) {
+        const now = this.ac.currentTime;
+        this.filter.frequency.cancelScheduledValues(now);
+        this.filter.frequency.setTargetAtTime(this.cutoffAt(this.filterEnv(now)), now, 0.01);
+      }
+    }
+    setWave() { const w = this.e.wave(); this.oscs.forEach(({ o }) => o.setPeriodicWave(w)); }
+    release() {
+      const now = this.ac.currentTime, g = this.amp.gain;
+      this.released = now;
+      if (g.cancelAndHoldAtTime) g.cancelAndHoldAtTime(now); else { g.cancelScheduledValues(now); g.setValueAtTime(g.value, now); }
+      g.linearRampToValueAtTime(0, now + P.release);
+      if (this.useFilter) { this.filter.frequency.cancelScheduledValues(now); this.filter.frequency.setTargetAtTime(this.cutoffAt(FILTER_ENV.sustain), now, FILTER_ENV.release / 3); }
+      this.stopAt(now + P.release + 0.05);
+    }
+    stop(fast) {
+      const now = this.ac.currentTime, g = this.amp.gain;
+      g.cancelScheduledValues(now); g.setTargetAtTime(0, now, 0.004);
+      this.stopAt(now + 0.05);
+    }
+    stopAt(time) { this.oscs.forEach(({ o }) => { try { o.stop(time); } catch (_) {} }); setTimeout(() => this.amp.disconnect(), (time - this.ac.currentTime) * 1000 + 200); }
+  }
+
+  // ---- transport ----
+  const holdBtn = $("fxHold"), playBtn = $("fxPlay");
+  let holding = false, playTimer = 0;
+  function setHold(on) {
+    holding = on; holdBtn.textContent = on ? "■ Release" : "▶ Hold note"; holdBtn.setAttribute("aria-pressed", String(on));
+    clearTimeout(playTimer);
+    if (on) engine.noteOn(); else engine.noteOff();
+  }
+  holdBtn.addEventListener("click", () => setHold(!holding));
+  playBtn.addEventListener("click", () => {
+    if (holding) setHold(false);
+    engine.noteOn(); clearTimeout(playTimer); playTimer = setTimeout(() => engine.noteOff(), 900);
+  });
+  $("fxNote").addEventListener("change", () => { if (holding) engine.noteOn(); });
+  $("fxReset").addEventListener("click", () => seed(true));
+
+  function sourceText() {
+    const w = window.wavetableStory && window.wavetableStory.current();
+    $("fxWave").textContent = w ? `${w.name}, frame ${w.frame}` : "–";
+  }
+  window.addEventListener("wavetablechange", () => { sourceText(); if (engine.voice) engine.voice.setWave(); });
+  function seed(force) {
+    const m = window.objectSynthMacros && window.objectSynthMacros();
+    if (!m || (dirty && !force)) return;
+    P = fromMacros(m); seededFrom = m.name || "the object"; dirty = false;
+    $("fxSeed").textContent = `${seededFrom}'s macros`;
+    showValues();
+    for (const key of ["filterBankEnabled", "lfoEnabled", "distortionEnabled", "chorusEnabled"]) engine.update(key);
+  }
+  window.addEventListener("pagechange", e => {
+    visible = e.detail === "effects";
+    if (visible) { seed(false); sourceText(); requestAnimationFrame(loop); showValues(); }
+    else if (holding) setHold(false);
+  });
+
+  // ---- views ----
+  const views = {};
+  for (const [name, card] of Object.entries(viewCards)) {
+    const c = card.querySelector("canvas"); views[name] = { c, g: c.getContext("2d"), w: 0, h: 0 };
+    new ResizeObserver(() => {
+      const r = c.getBoundingClientRect(), dpr = window.devicePixelRatio || 1;
+      views[name].w = r.width; views[name].h = r.height;
+      c.width = r.width * dpr; c.height = r.height * dpr; views[name].g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }).observe(c);
+  }
+  let visible = false, buf = null, bufL = null, bufR = null, freq = null;
+  const envTrace = [];
+  const lpMag = (f, fc, q) => { const x = f / fc; return 1 / Math.sqrt((1 - x * x) ** 2 + (x / q) ** 2); };
+  function label(g, text, x, y, color, align = "left") { g.font = MONO; g.fillStyle = color; g.textAlign = align; g.textBaseline = "alphabetic"; g.fillText(text, x, y); }
+
+  function drawScope(v) {
+    const { g, w, h } = v; g.clearRect(0, 0, w, h);
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
+    if (!engine.ac) return;
+    engine.mono.getFloatTimeDomainData(buf);
+    const period = engine.ac.sampleRate / noteHz(), span = Math.round(period * 2);
+    let start = 0;   // trigger: the first rising zero crossing
+    for (let i = 1; i < buf.length - span; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { start = i; break; }
+    const scale = (h / 2 - 10) / 0.3;
+    g.strokeStyle = C.lcd; g.lineWidth = 2; g.beginPath();
+    for (let i = 0; i < span; i++) { const x = i / (span - 1) * w, y = h / 2 - buf[start + i] * scale; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+    g.stroke();
+    label(g, "2 cycles", w - 8, h - 8, C.dim, "right");
+  }
+  function drawSpectrum(v) {
+    const { g, w, h } = v; g.clearRect(0, 0, w, h);
+    const fx = f => Math.log(f / 30) / Math.log(20000 / 30) * w;
+    g.strokeStyle = C.edge; g.lineWidth = 1;
+    for (const f of [100, 1000, 10000]) { g.beginPath(); g.moveTo(fx(f), 0); g.lineTo(fx(f), h); g.stroke(); label(g, f >= 1000 ? f / 1000 + "k" : String(f), fx(f) + 3, h - 6, C.dim); }
+    if (!engine.ac) return;
+    engine.mono.getFloatFrequencyData(freq);
+    const binHz = engine.ac.sampleRate / engine.mono.fftSize, lo = engine.mono.minDecibels, hi = engine.mono.maxDecibels;
+    g.beginPath(); g.moveTo(0, h);
+    for (let x = 0; x < w; x++) {
+      const f = 30 * Math.pow(20000 / 30, x / w), b = Math.min(freq.length - 1, Math.round(f / binHz));
+      let m = -Infinity; for (let k = Math.max(1, b - 1); k <= Math.min(freq.length - 1, b + 1); k++) m = Math.max(m, freq[k]);
+      g.lineTo(x, h - clamp((m - lo) / (hi - lo), 0, 1) * (h - 14));
+    }
+    g.lineTo(w, h); g.closePath();
+    const grad = g.createLinearGradient(0, 0, 0, h); grad.addColorStop(0, "rgba(201,184,255,0.55)"); grad.addColorStop(1, "rgba(201,184,255,0.04)");
+    g.fillStyle = grad; g.fill(); g.strokeStyle = C.lcd; g.lineWidth = 1.2; g.stroke();
+    // filter curves: 0 dB near the top, -48 dB at the bottom
+    const curve = (fc, q, color, name) => {
+      g.strokeStyle = color; g.lineWidth = 1.6; g.setLineDash([5, 4]); g.beginPath();
+      for (let x = 0; x < w; x += 2) { const f = 30 * Math.pow(20000 / 30, x / w), db = 20 * Math.log10(lpMag(f, fc, q)); const y = 16 + clamp(-db / 48, -0.2, 1) * (h - 30); x ? g.lineTo(x, y) : g.moveTo(x, y); }
+      g.stroke(); g.setLineDash([]); label(g, name, clamp(fx(fc), 40, w - 4), 12, color, "right");
+    };
+    const now = engine.ac.currentTime;
+    if (P.filterBankEnabled) {
+      const lfo = P.lfoEnabled ? Math.sin(2 * Math.PI * (BPM / 60) / DIVISIONS[P.lfoSync][1] * (now - engine.lfoStart)) : 0;
+      curve(clamp(P.lpCutoff * Math.pow(2, 4 * clamp(P.lfoRoute1Depth, -1, 1) * lfo), 20, 20000), P.lpResonance, C.tex, "filter bank");
+    }
+    if (P.filterEnvEnabled && engine.voice && engine.voice.useFilter) curve(engine.voice.cutoffAt(engine.voice.filterEnv(now)), Math.SQRT1_2, C.body, "voice filter");
+  }
+  function drawStereo(v) {
+    const { g, w, h } = v;
+    g.fillStyle = "rgba(12,13,15,0.35)"; g.fillRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 12;
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.beginPath(); g.moveTo(cx, cy - R); g.lineTo(cx, cy + R); g.moveTo(cx - R, cy); g.lineTo(cx + R, cy); g.stroke();
+    label(g, "L", cx - R * 0.72, cy - R * 0.72, C.dim, "center"); label(g, "R", cx + R * 0.72, cy - R * 0.72, C.dim, "center");
+    if (!engine.ac) return;
+    engine.anL.getFloatTimeDomainData(bufL); engine.anR.getFloatTimeDomainData(bufR);
+    const k = R / 0.3; let lr = 0, ll = 0, rr = 0;
+    g.strokeStyle = "rgba(112,214,162,0.7)"; g.lineWidth = 1; g.beginPath();
+    for (let i = 0; i < bufL.length; i++) {
+      const l = bufL[i], r = bufR[i]; lr += l * r; ll += l * l; rr += r * r;
+      const x = cx + (r - l) * Math.SQRT1_2 * k, y = cy - (l + r) * Math.SQRT1_2 * k;
+      i ? g.lineTo(x, y) : g.moveTo(x, y);
+    }
+    g.stroke();
+    const corr = ll * rr > 1e-12 ? lr / Math.sqrt(ll * rr) : 1;
+    g.fillStyle = C.glass; g.fillRect(4, h - 22, 150, 18);
+    label(g, `correlation ${corr >= 0 ? "+" : ""}${corr.toFixed(2)}`, 8, h - 8, ll * rr > 1e-12 ? C.ink : C.dim);
+  }
+  function drawEnvelope(v) {
+    const { g, w, h } = v; g.clearRect(0, 0, w, h);
+    const span = 4, now = engine.ac ? engine.ac.currentTime : 0;
+    if (engine.ac) {
+      engine.mono.getFloatTimeDomainData(buf);
+      let s = 0; for (let i = buf.length - 2048; i < buf.length; i++) s = Math.max(s, Math.abs(buf[i]));
+      envTrace.push([now, s]);
+      while (envTrace.length && envTrace[0][0] < now - span) envTrace.shift();
+    }
+    g.strokeStyle = C.edge; g.lineWidth = 1; g.beginPath(); g.moveTo(0, h - 16); g.lineTo(w, h - 16); g.stroke();
+    for (let s = 1; s < span; s++) { const x = w - s / span * w; g.beginPath(); g.moveTo(x, h - 16); g.lineTo(x, h - 11); g.stroke(); }
+    label(g, "−4 s", 4, h - 2, C.dim); label(g, "now", w - 4, h - 2, C.dim, "right");
+    if (envTrace.length < 2) return;
+    const top = 10, base = h - 16, scale = (base - top) / 0.3;
+    g.beginPath(); g.moveTo(w - (now - envTrace[0][0]) / span * w, base);
+    for (const [t, s] of envTrace) g.lineTo(w - (now - t) / span * w, base - Math.min(s * scale, base - top));
+    g.lineTo(w, base); g.closePath();
+    g.fillStyle = "rgba(112,214,162,0.18)"; g.fill(); g.strokeStyle = C.body; g.lineWidth = 1.6; g.stroke();
+  }
+  function loop() {
+    if (!visible) return;
+    if (engine.ac && !buf) { buf = new Float32Array(engine.mono.fftSize); freq = new Float32Array(engine.mono.frequencyBinCount); bufL = new Float32Array(2048); bufR = new Float32Array(2048); }
+    if (views.scope.w) drawScope(views.scope);
+    if (views.spectrum.w) drawSpectrum(views.spectrum);
+    if (views.stereo.w) drawStereo(views.stereo);
+    if (views.env.w) drawEnvelope(views.env);
+    requestAnimationFrame(loop);
+  }
+  new ResizeObserver(drawCurve).observe(curveCanvas);
+  showValues(); sourceText();
+  if (location.hash === "#effects") { visible = true; seed(false); requestAnimationFrame(loop); }
 })();
 </script>
 </body>
