@@ -7,6 +7,7 @@ Photograph an object, turn its shape into a wavetable synth sound.
   and has a **FROM CAMERA** button that runs the pipeline.
 - `docs/explorer.html`: an interactive page that shows how it all works, with
   animations, knobs and sound (see [Explorer page](#explorer-page)).
+- `docs/report.pdf`: the short project report (LaTeX source in `docs/report.tex`).
 
 The camera button opens the pipeline in a terminal window: Terminal on macOS,
 a command prompt on Windows, your terminal emulator on Linux (`$TERMINAL`, or the
