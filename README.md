@@ -27,6 +27,15 @@ python3.12 -m venv .venv
 .venv/bin/pip install -r CV/requirements.txt
 ```
 
+Fedora ships a newer Python by default; install 3.12 next to it with
+`sudo dnf install python3.12`. On Linux without an NVIDIA GPU, install the CPU-only
+PyTorch **before** the line above: the default one downloads several GB of CUDA
+libraries that are of no use there.
+
+```bash
+.venv/bin/pip install torch==2.14.1 torchvision==0.29.1 --index-url https://download.pytorch.org/whl/cpu
+```
+
 Windows (PowerShell):
 
 ```powershell
@@ -58,7 +67,11 @@ someone else's computer points to their folders and its camera button will not w
 
 Prerequisites: a C++17 compiler (Xcode Command Line Tools on macOS, Visual Studio
 on Windows, GCC/Clang plus JUCE's Linux packages on Linux), CMake and Ninja
-(macOS: `brew install cmake ninja`).
+(macOS: `brew install cmake ninja`). On Fedora, everything in one line:
+
+```bash
+sudo dnf install gcc-c++ cmake ninja-build pkgconf alsa-lib-devel freetype-devel fontconfig-devel libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXext-devel
+```
 
 ```bash
 cd ObjectSynth
@@ -66,7 +79,18 @@ cmake --preset release
 cmake --build --preset release --target ObjectSynth_VST3 ObjectSynth_Standalone
 ```
 
-The first configure downloads JUCE 9.0.5 (internet needed). The plugin is in
+The first configure downloads JUCE 9.0.5 (internet needed).
+
+**No DAW? Use the standalone app.** ObjectSynth also builds as a normal desktop app
+with its own audio settings and an on-screen keyboard (a MIDI keyboard works too).
+To build only that, use `--target ObjectSynth_Standalone`. It is in
+`build/release/ObjectSynth_artefacts/Release/Standalone/`:
+
+- macOS: `open build/release/ObjectSynth_artefacts/Release/Standalone/ObjectSynth.app`
+- Windows: `build\release\ObjectSynth_artefacts\Release\Standalone\ObjectSynth.exe`
+- Linux: `./build/release/ObjectSynth_artefacts/Release/Standalone/ObjectSynth`
+
+The plugin is in
 `build/release/ObjectSynth_artefacts/Release/VST3/ObjectSynth.vst3`; to use it in a
 DAW, copy it to the VST3 folder:
 
@@ -144,11 +168,17 @@ first photo takes a few seconds while SAM loads. Stop the server with Ctrl+C.
 
 ## Troubleshooting
 
+Linux note: we developed and tested on macOS. The Linux build and camera button follow
+the same code but were not tried on a real Linux machine; Fedora was checked against its
+documentation (packages, Ptyxis, Wayland). The explorer page works everywhere.
+
 | Message | Fix |
 | --- | --- |
 | `Python not found: …` | Step 1, at the repository root; or the plugin was built from another checkout (step 3). |
 | `CV pipeline not found: …` | The plugin was built from another folder: build it again from this checkout. |
 | `ModuleNotFoundError` in Terminal | `.venv/bin/pip install -r CV/requirements.txt` |
 | Black or no camera image | Allow the camera (step 4). |
-| `No terminal found` (Linux) | Set `$TERMINAL` to your terminal, or install xterm. |
+| `No terminal found` (Linux) | Set `$TERMINAL` to your terminal, or install xterm. Ptyxis (Fedora), GNOME Terminal, Konsole, xfce4-terminal, kitty and Alacritty are found by themselves. |
+| `Could not load the Qt platform plugin "xcb"` (Linux) | The camera windows need XWayland's xcb plugin: `sudo dnf install xcb-util-cursor` (Fedora) or `sudo apt install libxcb-cursor0` (Ubuntu). |
+| No sound from the standalone app (Linux) | Open its **Options** > audio settings and pick the output device. JUCE talks to ALSA, which PipeWire provides on Fedora. |
 | Download error while segmenting | Get the SAM model with internet on (step 2). |

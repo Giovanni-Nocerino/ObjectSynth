@@ -206,7 +206,9 @@ private:
         std::vector<Emulator> emulators;
         const auto preferred = juce::SystemStats::getEnvironmentVariable("TERMINAL", {});
         if (preferred.isNotEmpty()) emulators.push_back({ preferred, "-e" });
-        for (const auto& e : { Emulator { "x-terminal-emulator", "-e" }, Emulator { "gnome-terminal", "--" },
+        // ptyxis is Fedora Workstation's default terminal (41+), gnome-terminal Ubuntu's.
+        for (const auto& e : { Emulator { "x-terminal-emulator", "-e" }, Emulator { "ptyxis", "--" },
+                               Emulator { "gnome-terminal", "--" },
                                Emulator { "konsole", "-e" }, Emulator { "xfce4-terminal", "-x" },
                                Emulator { "kitty", "" }, Emulator { "alacritty", "-e" },
                                Emulator { "xterm", "-e" } })

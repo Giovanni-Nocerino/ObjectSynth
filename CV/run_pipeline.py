@@ -12,9 +12,15 @@ CANCELLED; for OK the second line is the preset's path, otherwise a message.
 
 import argparse
 import os
+import sys
 from pathlib import Path
 
-from acquisition import capture_image
+# opencv-python ships its own Qt without the Wayland plugin, so on a Wayland desktop
+# (e.g. Fedora) its windows would not open: run them through XWayland instead.
+if sys.platform.startswith("linux") and os.environ.get("WAYLAND_DISPLAY"):
+    os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
+
+from acquisition import capture_image  # noqa: E402  (imports cv2: after the line above)
 from make_presets import CAMERA_PRESET_DIRECTORY, make_preset, set_object_name
 from recognition import segment_image
 from to_wav import export_wavetable
