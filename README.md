@@ -18,11 +18,13 @@ alacritty, xterm). The pipeline itself is plain Python.
 
 The plugin looks for Python in a `.venv` folder at the **root of this repository**
 (`.venv/bin/python` on macOS and Linux, `.venv\Scripts\python.exe` on Windows),
-so create it exactly there. Use Python 3.12.
+so create it exactly there. Use Python 3.12. All commands below start from that root
+folder unless they say otherwise.
 
 macOS / Linux:
 
 ```bash
+git clone https://github.com/Giovanni-Nocerino/ObjectSynth.git
 cd ObjectSynth
 python3.12 -m venv .venv
 .venv/bin/pip install -r CV/requirements.txt
@@ -40,6 +42,7 @@ libraries that are of no use there.
 Windows (PowerShell):
 
 ```powershell
+git clone https://github.com/Giovanni-Nocerino/ObjectSynth.git
 cd ObjectSynth
 py -3.12 -m venv .venv
 .venv\Scripts\pip install -r CV\requirements.txt
@@ -74,6 +77,8 @@ on Windows, GCC/Clang plus JUCE's Linux packages on Linux), CMake and Ninja
 sudo dnf install gcc-c++ cmake ninja-build pkgconf alsa-lib-devel freetype-devel fontconfig-devel libX11-devel libXrandr-devel libXinerama-devel libXcursor-devel libXext-devel
 ```
 
+From the repository root, go into the plugin folder (also called `ObjectSynth`):
+
 ```bash
 cd ObjectSynth
 cmake --preset release
@@ -85,7 +90,8 @@ The first configure downloads JUCE 9.0.5 (internet needed).
 **No DAW? Use the standalone app.** ObjectSynth also builds as a normal desktop app
 with its own audio settings and an on-screen keyboard (a MIDI keyboard works too).
 To build only that, use `--target ObjectSynth_Standalone`. It is in
-`build/release/ObjectSynth_artefacts/Release/Standalone/`:
+`ObjectSynth/build/release/ObjectSynth_artefacts/Release/Standalone/` (paths below are
+from the plugin folder):
 
 - macOS: `open build/release/ObjectSynth_artefacts/Release/Standalone/ObjectSynth.app`
 - Windows: `build\release\ObjectSynth_artefacts\Release\Standalone\ObjectSynth.exe`
@@ -122,7 +128,7 @@ Press **FROM CAMERA** in the oscillator panel. A terminal window opens:
 The preset is saved in `camera-acquired-presets/` and loaded into the synth. Errors are shown
 under the oscillator and in the terminal window.
 
-You can also run the pipeline without the plugin:
+You can also run the pipeline without the plugin, from the repository root:
 
 ```bash
 cd CV
@@ -146,8 +152,9 @@ object from the **Object** menu at the top and every tab follows it:
 
 There are two ways to open it.
 
-**Just the page (no setup).** Open `docs/explorer.html` in any browser, e.g. by
-double-clicking it. Everything works with the 29 example objects (photos from the
+**Just the page (no setup).** Open it online at
+<https://giovanni-nocerino.github.io/ObjectSynth/explorer.html>, or open
+`docs/explorer.html` in any browser, e.g. by double-clicking it. Everything works with the 29 example objects (photos from the
 dataset, already inside the page): animations, knobs and sound. Only **TRY YOUR OWN!**
 needs the server below; without it, the lens shows the command to start it.
 

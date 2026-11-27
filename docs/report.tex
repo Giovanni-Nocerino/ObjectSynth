@@ -20,7 +20,7 @@
 \vspace{-1.8em}
 
 \section*{Overview}
-Have you ever looked at a mug, a key, or a random gadget on your desk and wondered what it would sound like as a synth? That curiosity is where \textbf{ObjectSynth (OS)} starts. We built it for two reasons: to give a practical creative shortcut to music producers who struggle with sound design and feel stuck tweaking endless presets, and to answer a question anyone who loves music has asked at least once: what would this object actually sound like? You can run OS as a standalone playground or drop it straight into a DAW like Logic Pro or FL Studio as a VST/VST3. Under the hood, C++ and the JUCE framework handle the plugin wrapper, the UI, and the real-time audio engine, while Python takes care of vision and signal processing: OpenCV manages the camera and visual measurements, NumPy drives the signal math (including the FFTs behind the wavetable), and Meta's Segment Anything Model (SAM 2.1, running on PyTorch via Ultralytics)~[1] carves the object out of the frame.
+Have you ever looked at a mug, a key, or a random gadget on your desk and wondered what it would sound like as a synth? That curiosity is where \textbf{ObjectSynth (OS)} starts. We built it for two reasons: to give a practical creative shortcut to music producers who struggle with sound design and feel stuck tweaking endless presets, and to answer a question anyone who loves music has asked at least once: what would this object actually sound like? You can run OS as a standalone playground or drop it straight into a DAW like Ableton Live or FL Studio as a VST3. Under the hood, C++ and the JUCE framework handle the plugin wrapper, the UI, and the real-time audio engine, while Python takes care of vision and signal processing: OpenCV manages the camera and visual measurements, NumPy drives the signal math (including the FFTs behind the wavetable), and Meta's Segment Anything Model (SAM 2.1, running on PyTorch via Ultralytics)~[1] carves the object out of the frame.
 
 Splitting the project in two came naturally: \emph{Image Processing} turns what the camera sees into meaningful synth inputs, and \emph{Synth Programming} turns those numbers into something you actually want to play.
 
@@ -81,6 +81,6 @@ sudden jump is heard as a click.
 \end{figure}
 
 \vspace{0.2em}
-{\small [1] A.~Kirillov et al. \emph{Segment Anything}. arXiv:2304.02643, 2023. \url{https://arxiv.org/abs/2304.02643}}
+{\small [1] N.~Ravi et al. \emph{SAM 2: Segment Anything in Images and Videos}, 2024. \url{https://arxiv.org/abs/2408.00714}}
 
 \end{document}
